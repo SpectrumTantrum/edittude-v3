@@ -83,10 +83,11 @@ install_uv() {
     return 0
   fi
   info "Installing uv"
+  # This function's stdout is the uv path, so the installer's chatter goes to stderr.
   if command -v curl >/dev/null 2>&1; then
-    curl -LsSf https://astral.sh/uv/install.sh | sh
+    curl -LsSf https://astral.sh/uv/install.sh | sh >&2
   elif command -v wget >/dev/null 2>&1; then
-    wget -qO- https://astral.sh/uv/install.sh | sh
+    wget -qO- https://astral.sh/uv/install.sh | sh >&2
   else
     die "Need curl or wget to install uv."
   fi

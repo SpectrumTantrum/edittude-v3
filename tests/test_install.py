@@ -219,6 +219,43 @@ class InstallScriptTest(unittest.TestCase):
             subprocess.check_call(["bash", str(runner / "install.sh"), "--force"], env=env)
             self.assertEqual((home / "marker.txt").read_text(encoding="utf-8"), "one")
 
+    def test_uv_installer_chatter_does_not_become_the_uv_path(self):
+        # install_uv's stdout is the uv path. The upstream uv installer prints its
+        # progress on stdout, so it has to be redirected or it is what we try to exec.
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            home = temporary / "home"
+            stubs = temporary / "stubs"
+            for directory in (home, stubs):
+                directory.mkdir(parents=True)
+            # Stands in for `curl -LsSf https://astral.sh/uv/install.sh`.
+            (stubs / "curl").write_text(
+                "#!/bin/sh\n"
+                "cat <<'INSTALLER'\n"
+                'echo "downloading uv 0.12.17 aarch64-apple-darwin"\n'
+                'echo "installing to $HOME/.local/bin"\n'
+                'mkdir -p "$HOME/.local/bin"\n'
+                'printf \'#!/bin/sh\\necho "$@" >>"$HOME/uv-args"\\n\' >"$HOME/.local/bin/uv"\n'
+                'chmod +x "$HOME/.local/bin/uv"\n'
+                "echo \"everything's installed!\"\n"
+                "INSTALLER\n",
+                encoding="utf-8",
+            )
+            (stubs / "curl").chmod(0o755)
+
+            env = os.environ.copy()
+            env["HOME"] = str(home)
+            env["PATH"] = f"{stubs}:/usr/bin:/bin"
+            env["EDITTUDE_BIN"] = str(temporary / "bin")
+            env["EDITTUDE_CONFIG_HOME"] = str(temporary / "config")
+            env.pop("EDITTUDE_SKIP_SYNC", None)
+            done = subprocess.run(
+                ["bash", str(ROOT / "install.sh")], env=env, capture_output=True, text=True
+            )
+            self.assertEqual(done.returncode, 0, done.stderr)
+            # The path install_uv handed back was executable, and it was the uv we installed.
+            self.assertIn("sync", (home / "uv-args").read_text(encoding="utf-8"))
+
     def test_update_command_runs_installer(self):
         self.assertEqual(_parser().parse_args(["update"]).command, "update")
         self.assertTrue(_parser().parse_args(["update", "--force"]).force)
