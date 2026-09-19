@@ -5,6 +5,7 @@ import array
 from bisect import bisect_right
 from collections import defaultdict, deque
 from fractions import Fraction
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -127,7 +128,9 @@ def media_inspect(workspace: Path, request: dict) -> dict:
         directory = request.get("output_dir", "artifacts/previews")
         if not isinstance(directory, str):
             raise ValueError("output_dir must be a workspace path")
-        destinations = [output_path(root, f"{directory.rstrip('/')}/frame-{index:03}-{time:.6f}.png")
+        stem = re.sub(r"[^A-Za-z0-9_-]", "_", path.stem)[:40]  # Frames of different sources share this directory.
+        tag = hashlib.sha256(artifact_path(root, path).encode()).hexdigest()[:8]
+        destinations = [output_path(root, f"{directory.rstrip('/')}/{stem}-{tag}-frame-{index:03}-{time:.6f}.png")
                         for index, time in enumerate(timestamps)]
         frames = []
         with tempfile.TemporaryDirectory(prefix=".media-", dir=root) as temporary:
@@ -159,7 +162,10 @@ def media_inspect(workspace: Path, request: dict) -> dict:
         duration = _number(options.get("duration", min(10, _duration(info, "audio") - start)), "preview duration", 1e-6, 30)
         if start + duration > _duration(info, "audio") + 1e-6:
             raise ValueError("Audio preview exceeds the input duration")
-        destination = output_path(root, options.get("output", request.get("output_dir", "artifacts/previews").rstrip("/") + "/audio-preview.wav"))
+        directory = request.get("output_dir", "artifacts/previews")
+        if not isinstance(directory, str):
+            raise ValueError("output_dir must be a workspace path")
+        destination = output_path(root, options.get("output", directory.rstrip("/") + "/audio-preview.wav"))
         if destination.suffix.lower() != ".wav":
             raise ValueError("Audio previews require a .wav output")
         with tempfile.TemporaryDirectory(prefix=".media-", dir=root) as temporary:
@@ -196,7 +202,7 @@ def audio_timing(workspace: Path, request: dict) -> dict:
               "range": {"start": start, "end": end}, "review_status": "not auditioned"}
     if method == "silence":
         threshold = _number(request.get("threshold_db", -35), "threshold_db", -100, 0)
-        minimum = _number(request.get("minimum_silence", .2), "minimum_silence", .001, end-start)
+        minimum = _number(request.get("minimum_silence", min(.2, end-start)), "minimum_silence", .001, end-start)
         logged = _ff("-ss", str(start), "-i", path, "-t", str(end-start), "-map", "0:a:0", "-af",
                      f"silencedetect=noise={threshold}dB:d={minimum}", "-f", "null", "-")
         silences, opened = [], None
@@ -453,10 +459,22 @@ def _layout(channels: int) -> str:
     return "mono" if channels == 1 else "stereo"
 
 
+def _display_size(video: dict) -> tuple[int, int]:
+    """Coded size with the display matrix applied, as FFmpeg auto-rotates on decode."""
+    rotation = next((side["rotation"] for side in video.get("side_data_list") or [] if "rotation" in side),
+                    (video.get("tags") or {}).get("rotate", 0))
+    try:
+        turned = abs(int(float(rotation))) % 180 == 90
+    except (TypeError, ValueError):
+        turned = False
+    return (video["height"], video["width"]) if turned else (video["width"], video["height"])
+
+
 def _video_settings(info: dict, request: dict) -> tuple[int, int, Fraction, str]:
     video = _stream(info, "video")
-    width = _integer(request.get("width", video["width"]), "width", 2, 7680)
-    height = _integer(request.get("height", video["height"]), "height", 2, 7680)
+    source_width, source_height = _display_size(video)
+    width = _integer(request.get("width", source_width), "width", 2, 7680)
+    height = _integer(request.get("height", source_height), "height", 2, 7680)
     if width % 2 or height % 2:
         raise ValueError("Output width and height must be even for yuv420p")
     raw_fps = request.get("fps", video.get("avg_frame_rate") or video.get("r_frame_rate") or "30")
@@ -516,7 +534,8 @@ def _timeline(root: Path, request: dict, staged: Path, paths: list[str] | None =
         actual_duration = float(Fraction(frames, 1)/fps)
         args += ["-i", source]
         filters.append(f"[{index}:v:0]trim=start={source_start}:end={source_end},setpts=PTS-STARTPTS,"
-                       f"{_picture_filter(width, height, fps, fit)},trim=end_frame={frames},setpts=N/(({fps})*TB)[v{index}]")
+                       f"{_picture_filter(width, height, fps, fit)},tpad=stop_mode=clone:stop=-1,"  # Source trims can fall one frame short of the plan.
+                       f"trim=end_frame={frames},setpts=N/(({fps})*TB)[v{index}]")
         source_audio = shot.get("source_audio", "keep" if policy == "keep" else "mute")
         if source_audio not in {"keep", "mute"}:
             raise ValueError("shot source_audio must be keep or mute")

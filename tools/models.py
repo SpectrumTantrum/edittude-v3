@@ -17,6 +17,7 @@ import urllib.request
 
 from .common import (CapabilityUnavailable, artifact_path, input_path, model_python, models_root,
                      output_path as resolve_output, probe, publish, run)
+from .media import _integer
 
 INSTALL_HINT = "run: edittude-media models install (seed-vc and diffsinger need --models seed-vc,diffsinger)"
 # Weights installed by tools/install_models.py, relative to models_root().
@@ -172,8 +173,7 @@ def speech_synthesize(workspace: Path, text: str, output_path: str, voice: str |
     """Render plain text through an installed stock macOS say or eSpeak voice."""
     if not isinstance(text, str) or not text.strip() or "\x00" in text:
         raise ValueError("text must contain nonempty spoken text")
-    if type(rate) is not int or not 40 <= rate <= 600:
-        raise ValueError("rate must be an integer from 40 to 600 words per minute")
+    rate = _integer(rate, "rate", 40, 600)
     if voice is not None and (not isinstance(voice, str) or not voice.strip() or "\x00" in voice):
         raise ValueError("voice must be a stock voice name")
     if reference_audio_path is not None:
@@ -409,8 +409,10 @@ def image_describe(workspace: Path, image_paths: list[str], question: str) -> di
     except OSError as error:
         raise CapabilityUnavailable(
             f"No vision model at {url} ({error}). Start it, or run: edittude-v3 config set vision-url URL") from error
-    return {"model": model, "images": len(image_paths),
-            "description": reply["choices"][0]["message"]["content"].strip()}
+    description = ((reply.get("choices") or [{}])[0].get("message") or {}).get("content")
+    if not isinstance(description, str):
+        raise RuntimeError(f"{model} at {url} returned no message content: {json.dumps(reply)[:500]}")
+    return {"model": model, "images": len(image_paths), "description": description.strip()}
 
 
 def capabilities() -> dict:
@@ -437,7 +439,9 @@ def capabilities() -> dict:
         if not reason and not found.get(runtime, {}).get(modules[backend]):
             reason = f"{modules[backend]} is not installed in the configured Python runtime; {INSTALL_HINT}"
         try:
-            if backend == "DEMUCS":
+            if backend == "ASR":
+                _configured_path("EDITTUDE_ASR_MODEL_DIR")  # What model='base'/'local' resolves to; no downloads.
+            elif backend == "DEMUCS":
                 _configured_path("EDITTUDE_DEMUCS_REPO")
             elif backend == "DIFFSINGER":
                 directory = _configured_path("EDITTUDE_DIFFSINGER_DIR")

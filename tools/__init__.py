@@ -14,17 +14,21 @@ def get_tools(workspace: str | Path) -> list:
     if not root.is_dir():
         raise ValueError(f"Workspace is not a directory: {root}")
 
+    def virtual(text: str) -> str:
+        """Report host paths under the workspace as the virtual paths tools accept."""
+        return text.replace(str(root), "")
+
     def invoke(function, *args, **kwargs):
         try:
             result = function(root, *args, **kwargs)
             result.setdefault("status", "ok")
             return result
         except CapabilityUnavailable as exc:
-            return {"status": "unavailable", "error": str(exc)}
-        except subprocess.CalledProcessError as exc:
-            return {"status": "error", "error": (exc.stderr or str(exc))[-2000:]}
-        except (OSError, ValueError, TypeError, KeyError, RuntimeError, ImportError, subprocess.TimeoutExpired) as exc:
-            return {"status": "error", "error": str(exc)}
+            return {"status": "unavailable", "error": virtual(str(exc))}
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            return {"status": "error", "error": virtual(exc.stderr or str(exc))[-2000:]}
+        except (OSError, ValueError, TypeError, KeyError, AttributeError, RuntimeError, ImportError) as exc:
+            return {"status": "error", "error": virtual(str(exc))}
 
     def get_capabilities() -> dict:
         """Inspect installed media executables and optional model backends without downloads.
@@ -122,7 +126,7 @@ def get_tools(workspace: str | Path) -> list:
         """
         result = invoke(models.speech_synthesize, text, output_path, voice, rate,
                         reference_audio_path)
-        if utterance_id is not None:
+        if utterance_id is not None and result.get("status") == "ok":
             result["id"] = utterance_id
         return result
 
