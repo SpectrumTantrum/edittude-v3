@@ -128,5 +128,27 @@ class InstallerSchemaTest(unittest.TestCase):
         self.assertEqual(len(names), len(entry["files"]))
 
 
+class InstallFailureTest(unittest.TestCase):
+    """Missing tools and missing patches exit with a message, not a traceback."""
+
+    def test_missing_executable_exits_cleanly(self):
+        with self.assertRaises(SystemExit) as raised:
+            install_models._run(["definitely-not-a-command-xyz"])
+        self.assertIn("definitely-not-a-command-xyz is missing", str(raised.exception))
+
+    def test_failing_command_exits_cleanly(self):
+        with self.assertRaises(SystemExit) as raised:
+            install_models._run(["sh", "-c", "exit 3"])
+        self.assertIn("exit code 3", str(raised.exception))
+
+    def test_clone_checks_the_patch_before_cloning(self):
+        spec = {"url": "https://example.invalid/repo", "into": "no-such-backend", "sha": "0" * 40}
+        with patch.object(install_models, "_run") as run, \
+                self.assertRaises(SystemExit) as raised:
+            install_models._clone(spec, Path("/nowhere/clone"))
+        self.assertIn("no-such-backend.patch", str(raised.exception))
+        run.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

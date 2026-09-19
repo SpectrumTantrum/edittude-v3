@@ -115,7 +115,13 @@ def _uv() -> str:
 
 
 def _run(args: list[str | Path]) -> None:
-    subprocess.run([str(arg) for arg in args], check=True)
+    command = [str(arg) for arg in args]
+    try:
+        subprocess.run(command, check=True)
+    except FileNotFoundError:
+        raise SystemExit(f"{command[0]} is missing. Install it and run this again.") from None
+    except subprocess.CalledProcessError as error:
+        raise SystemExit(f"{command[0]} failed with exit code {error.returncode}") from None
 
 
 def _venv(deps: list[str]) -> None:
@@ -227,13 +233,15 @@ def _snapshot(entry: dict, destination: Path) -> None:
 
 def _clone(spec: dict, destination: Path) -> None:
     """Clone an upstream at its pinned sha and apply our patch, idempotently."""
+    patch = Path(__file__).resolve().parent / "patches" / f"{spec['into']}.patch"
+    if not patch.is_file():  # Before the clone: a clone we cannot patch is wasted bytes.
+        raise SystemExit(f"Missing patch {patch}")
     if not (destination / ".git").is_dir():
         print(f"clone  {spec['url']}")
         _run(["git", "clone", "--quiet", spec["url"], destination])
     git = ["git", "-C", str(destination)]
     if subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() != spec["sha"]:
         _run([*git, "checkout", "--force", "--quiet", spec["sha"]])
-    patch = Path(__file__).resolve().parent / "patches" / f"{spec['into']}.patch"
     if subprocess.run([*git, "apply", "--reverse", "--check", str(patch)], capture_output=True).returncode:
         print(f"patch  {patch.name}")
         _run([*git, "apply", str(patch)])
