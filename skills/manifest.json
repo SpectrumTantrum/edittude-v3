@@ -1,0 +1,331 @@
+{
+  "source_repository": "https://github.com/HKUDS/VideoAgent",
+  "source_revision": "f207987e3cffb554aaa6ffdbe733efb30f4b51ed",
+  "registry_path": "environment/config/registry.json",
+  "skills": [
+    {
+      "role": "LoudnessNormalizer",
+      "skill": "video-normalize-loudness",
+      "source_path": "environment/roles/loudness_normalizer.py",
+      "source_sha256": "b3574b6c3f7a6bc9cd5975ef3d9c03f341f1bc249925a40defeb157a4cedb2dc",
+      "tools": [
+        "media_inspect",
+        "media_render"
+      ]
+    },
+    {
+      "role": "Resampler",
+      "skill": "video-resample-audio",
+      "source_path": "environment/roles/resampler.py",
+      "source_sha256": "16dbc7f38e19b91a46a1bd8de1b5daba0179d654e7b0165c9be905ee88542a1b",
+      "tools": [
+        "media_inspect",
+        "media_render"
+      ]
+    },
+    {
+      "role": "Separator",
+      "skill": "video-separate-stems",
+      "source_path": "environment/roles/separator.py",
+      "source_sha256": "e1e3ab689526f380c50c1051a1a54130d430d7e20b32939b018f9ed01f834280",
+      "tools": [
+        "media_inspect",
+        "audio_separate"
+      ]
+    },
+    {
+      "role": "Transcriber",
+      "skill": "video-transcribe-audio",
+      "source_path": "environment/roles/transcriber.py",
+      "source_sha256": "bf8cf65dc1edf283cc91ec89b04027c2ba38d1b953fc5d62a02cdabbfcf873bb",
+      "tools": [
+        "media_inspect",
+        "speech_transcribe"
+      ]
+    },
+    {
+      "role": "Mixer",
+      "skill": "video-mix-audio",
+      "source_path": "environment/roles/mixer.py",
+      "source_sha256": "e36a1ce3cb4a8eb7cdad9acbd735d9dd3039034f22ee74d4d1a08744067ced8d",
+      "tools": [
+        "media_inspect",
+        "media_render"
+      ]
+    },
+    {
+      "role": "Merge",
+      "skill": "video-mux-audio",
+      "source_path": "environment/roles/merge.py",
+      "source_sha256": "a666daef837fd16e52b1be5b310a12d3acb16937d179155566517b5ce7d76fde",
+      "tools": [
+        "media_inspect",
+        "media_render"
+      ]
+    },
+    {
+      "role": "AudioExtractor",
+      "skill": "video-extract-audio",
+      "source_path": "environment/roles/audio_extractor.py",
+      "source_sha256": "483df1c9b13a391899110fe87795873a3eeac55511f8227a25eba6f900c15c40",
+      "tools": [
+        "media_inspect",
+        "media_render"
+      ]
+    },
+    {
+      "role": "VoiceGenerator",
+      "skill": "video-narrate-scenes",
+      "source_path": "environment/roles/voice_generator.py",
+      "source_sha256": "ff6b4519b77e444e42d9d3049a278d7369aa638d368e23436ff0768b8e3966d1",
+      "tools": [
+        "media_inspect",
+        "speech_synthesize",
+        "media_render"
+      ]
+    },
+    {
+      "role": "VideoEditor",
+      "skill": "video-assemble-edit",
+      "source_path": "environment/roles/vid_editor.py",
+      "source_sha256": "7c5abe5630907c4a05d9dee9c751e43f8d54037a48ff837e8011dbc2943de157",
+      "tools": [
+        "media_inspect",
+        "media_render"
+      ]
+    },
+    {
+      "role": "VideoPreloader",
+      "skill": "video-index-footage",
+      "source_path": "environment/roles/vid_preloader.py",
+      "source_sha256": "8be4782d2e6156bc0809959b5cda726b1d405d51a3d1b2ae28b5cebc689c0e23",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "VideoSearcher",
+      "skill": "video-find-shots",
+      "source_path": "environment/roles/vid_searcher.py",
+      "source_sha256": "72561d8f89cbd15207833379d3ef3fc8cbc3db1fd8b96a9667ea387f3ca530ff",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "VideoConversion",
+      "skill": "video-storyboard-timed-audio",
+      "source_path": "environment/roles/vid_conversion.py",
+      "source_sha256": "1d30689843019c6630092c856e8c0cdd62f3ec4b24a239b1053887d6f4b84e77",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "TTSWriter",
+      "skill": "video-write-speech-patches",
+      "source_path": "environment/roles/tts/tts_writer.py",
+      "source_sha256": "0771b08187c5910cf7980014242bdaa07ea19914eb23b468fc9038364ab26dcb",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "TTSSlicer",
+      "skill": "video-slice-speech-reference",
+      "source_path": "environment/roles/tts/tts_slicer.py",
+      "source_sha256": "68783888a673cb3ee7678456a16511289a6c433e2449d207beb9fde4cef37e65",
+      "tools": [
+        "media_inspect",
+        "speech_transcribe",
+        "audio_timing",
+        "media_render"
+      ]
+    },
+    {
+      "role": "TTSInfer",
+      "skill": "video-synthesize-speech-patches",
+      "source_path": "environment/roles/tts/tts_infer.py",
+      "source_sha256": "c2522708d223955198f9c9619e9c3b32c2515076a9a71f2c34417222e1728434",
+      "tools": [
+        "media_inspect",
+        "speech_synthesize",
+        "media_render"
+      ]
+    },
+    {
+      "role": "TTSReplace",
+      "skill": "video-replace-speech",
+      "source_path": "environment/roles/tts/tts_replace.py",
+      "source_sha256": "e1bf79c6e808252c3722f3b0acef4d6788c310f5de4f602958427d40783feab6",
+      "tools": [
+        "media_inspect",
+        "media_render"
+      ]
+    },
+    {
+      "role": "SVCAdapter",
+      "skill": "video-adapt-lyrics",
+      "source_path": "environment/roles/svc/svc_adapter.py",
+      "source_sha256": "4130ece556f6ef15e6ea858938de0b0044c0d480a7293b7ada38b890e9c12168",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "SVCAnalyzer",
+      "skill": "video-transcribe-melody",
+      "source_path": "environment/roles/svc/svc_analyzer.py",
+      "source_sha256": "01f051e813c58222e4dbca7a1dcaadf37c11fd271320cdc1e975537168a17463",
+      "tools": [
+        "media_inspect",
+        "score_read"
+      ]
+    },
+    {
+      "role": "SVCSingle",
+      "skill": "video-synthesize-singing",
+      "source_path": "environment/roles/svc/svc_single.py",
+      "source_sha256": "00da709cdd914fa1dd0ed39bcbbaba0f7b5ebc1b949a8630e0e63f8436a722b8",
+      "tools": [
+        "media_inspect",
+        "singing_synthesize",
+        "media_render"
+      ]
+    },
+    {
+      "role": "SVCCoverist",
+      "skill": "video-convert-singing-voice",
+      "source_path": "environment/roles/svc/svc_coverist.py",
+      "source_sha256": "d39c17568f05c630720943545ef4d84b2a6a4a2fbd412ae9178c16478350b9d6",
+      "tools": [
+        "media_inspect",
+        "voice_convert"
+      ]
+    },
+    {
+      "role": "SVCConversion",
+      "skill": "video-time-lyrics",
+      "source_path": "environment/roles/svc/svc_conversion.py",
+      "source_sha256": "d9e80133258eaaf07f4c9af14e5922be38a8131c2af7677372b1db68f01e9790",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "StandUpAdapter",
+      "skill": "video-adapt-standup",
+      "source_path": "environment/roles/stand_up/stand_up_adapter.py",
+      "source_sha256": "a9cb4504f1a4eceb17acb0295c8d04dd86d622364105041a1036ac97d07c28c9",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "StandUpSynth",
+      "skill": "video-synthesize-standup",
+      "source_path": "environment/roles/stand_up/stand_up_synth.py",
+      "source_sha256": "b49638fa64d3bac04dd57a8e56d0c5973cea78bcb8d49309b34e3905ca6084a8",
+      "tools": [
+        "media_inspect",
+        "speech_synthesize",
+        "media_render"
+      ]
+    },
+    {
+      "role": "StandUpConversion",
+      "skill": "video-time-standup",
+      "source_path": "environment/roles/stand_up/stand_up_conversion.py",
+      "source_sha256": "20e551986cbf05ea77c26ebeb69957c61415d594f6c817e58c37c4ff2d36ac87",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "CrossTalkAdapter",
+      "skill": "video-adapt-dialogue",
+      "source_path": "environment/roles/cross_talk/cross_talk_adapter.py",
+      "source_sha256": "be7faef4d2747602444bb891d41b8869aecace540ee4aba75f0beecb4356392b",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "CrossTalkSynth",
+      "skill": "video-synthesize-dialogue",
+      "source_path": "environment/roles/cross_talk/cross_talk_synth.py",
+      "source_sha256": "741650fa4819396e29c031287b88be46f27388b5e3d4fb228513ca44442047e9",
+      "tools": [
+        "media_inspect",
+        "speech_synthesize",
+        "media_render"
+      ]
+    },
+    {
+      "role": "CrossTalkConversion",
+      "skill": "video-time-dialogue",
+      "source_path": "environment/roles/cross_talk/cross_talk_conversion.py",
+      "source_sha256": "934d3b6b1ac3cee5f73ad6edf5af0abf6c4213daf774db455ec8daeef33db412",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "RhythmDetector",
+      "skill": "video-detect-beats",
+      "source_path": "environment/roles/vid_rhythm/rhythm_detector.py",
+      "source_sha256": "3f5ab128bbbe48801866c9816aa655301eafe11e1babe2aae1bdf9ef5f46a596",
+      "tools": [
+        "media_inspect",
+        "audio_timing"
+      ]
+    },
+    {
+      "role": "RhythmContentGenerator",
+      "skill": "video-plan-beat-montage",
+      "source_path": "environment/roles/vid_rhythm/rhythm_story_gen.py",
+      "source_sha256": "aee68576ac75000a35967637520283022eae0bfe0216625212abf98c9e27acf3",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "CommentaryContentGenerator",
+      "skill": "video-write-commentary",
+      "source_path": "environment/roles/vid_comm/comm_story_gen.py",
+      "source_sha256": "31eabbd010e4e76c3d55e54e58e4956133ae01fade1b1da86043fe61a853b21a",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "NewsContentGenerator",
+      "skill": "video-write-news",
+      "source_path": "environment/roles/vid_news/news_story_gen.py",
+      "source_sha256": "0df282db94f458649de9dab45a8bad057391367b9bb69cae1a8c8404f0be7144",
+      "tools": [
+        "media_inspect"
+      ]
+    },
+    {
+      "role": "VideoContentQA",
+      "skill": "video-answer-questions",
+      "source_path": "environment/roles/vid_qa/content_loader.py",
+      "source_sha256": "c2aaa37d558e90f976238ee3e452062543ce5e1b1d79e3f30881705cf3072e36",
+      "tools": [
+        "media_inspect",
+        "speech_transcribe"
+      ]
+    },
+    {
+      "role": "VideoSummarizationGenerator",
+      "skill": "video-summarize",
+      "source_path": "environment/roles/vid_summ/summ_loader.py",
+      "source_sha256": "2efe5cc54732bc71fb688c0c78ecb9af42919f4e10133d1059c2b3e1952bc32c",
+      "tools": [
+        "media_inspect",
+        "speech_transcribe"
+      ]
+    }
+  ]
+}

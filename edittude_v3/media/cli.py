@@ -1,0 +1,241 @@
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from edittude_v3.media.core import LOOKS, MediaError, write_json
+from edittude_v3.media.edl import first_cut, load_edl, save_edl, tighten
+from edittude_v3.media.inventory import extract_thumbs, write_inventory
+from edittude_v3.media.proof import run_proof
+from edittude_v3.media.qc import write_review
+from edittude_v3.media.render import (
+    assemble,
+    burn_srt,
+    finish,
+    grade,
+    grab_frames,
+    mix,
+    reframe,
+    titles,
+)
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = _parser()
+    args = parser.parse_args(argv)
+    try:
+        args.func(args)
+    except MediaError as exc:
+        raise SystemExit(str(exc)) from exc
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="edittude-media",
+        description="Local ffmpeg tools for inventory, cut, mix, grade, titles, QC.",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    p = sub.add_parser("inventory", help="ffprobe a footage folder")
+    p.add_argument("folder", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.set_defaults(func=_cmd_inventory)
+
+    p = sub.add_parser("thumbs", help="extract stills from an inventory")
+    p.add_argument("inventory", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--count", type=int, default=3)
+    p.set_defaults(func=_cmd_thumbs)
+
+    p = sub.add_parser("plan", help="write a first-cut EDL from inventory")
+    p.add_argument("inventory", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--title", default="")
+    p.add_argument("--aspect", default="16:9")
+    p.add_argument("--look", default="warm", choices=sorted(LOOKS))
+    p.add_argument("--target", type=float)
+    p.set_defaults(func=_cmd_plan)
+
+    p = sub.add_parser("assemble", help="render an EDL to a picture cut")
+    p.add_argument("edl", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--work", type=Path)
+    p.set_defaults(func=_cmd_assemble)
+
+    p = sub.add_parser("mix", help="duck voiceover / music under picture")
+    p.add_argument("video", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--vo", type=Path)
+    p.add_argument("--music", type=Path)
+    p.add_argument("--amb-db", type=float, default=-16)
+    p.add_argument("--music-db", type=float, default=-22)
+    p.set_defaults(func=_cmd_mix)
+
+    p = sub.add_parser("grade", help="apply a still look")
+    p.add_argument("video", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--look", default="warm", choices=sorted(LOOKS))
+    p.set_defaults(func=_cmd_grade)
+
+    p = sub.add_parser("titles", help="burn an opening title")
+    p.add_argument("video", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--title", required=True)
+    p.add_argument("--subtitle", default="")
+    p.set_defaults(func=_cmd_titles)
+
+    p = sub.add_parser(
+        "captions",
+        help="burn an SRT if ffmpeg has libass. this Homebrew build usually does not",
+    )
+    p.add_argument("video", type=Path)
+    p.add_argument("--srt", type=Path, required=True)
+    p.add_argument("--out", type=Path, required=True)
+    p.set_defaults(func=_cmd_captions)
+
+    p = sub.add_parser("reframe", help="crop to 16:9, 9:16, or 1:1")
+    p.add_argument("video", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--aspect", required=True, choices=("16:9", "9:16", "1:1"))
+    p.set_defaults(func=_cmd_reframe)
+
+    p = sub.add_parser("finish", help="grade + title + mix in one encode")
+    p.add_argument("picture", type=Path)
+    p.add_argument("edl", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.set_defaults(func=_cmd_finish)
+
+    p = sub.add_parser("qc", help="black / silence / loudness / duration")
+    p.add_argument("video", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.set_defaults(func=_cmd_qc)
+
+    p = sub.add_parser("frames", help="grab stills from a render")
+    p.add_argument("video", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.set_defaults(func=_cmd_frames)
+
+    p = sub.add_parser("recut", help="tighten an EDL after QC")
+    p.add_argument("edl", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--drop-longest", action="store_true")
+    p.set_defaults(func=_cmd_recut)
+
+    p = sub.add_parser("proof", help="inventory, plan, assemble, finish, QC")
+    p.add_argument("folder", type=Path)
+    p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--title", default="A DAY OUT")
+    p.add_argument("--subtitle", default="")
+    p.add_argument("--aspect", default="16:9")
+    p.add_argument("--look", default="warm")
+    p.add_argument("--no-thumbs", action="store_true")
+    p.set_defaults(func=_cmd_proof)
+
+    return parser
+
+
+def _cmd_inventory(args: argparse.Namespace) -> None:
+    data = write_inventory(args.folder, args.out)
+    totals = data["totals"]
+    print(
+        f"wrote {args.out}  {totals['video']} clips, "
+        f"{totals['video_seconds']}s picture, {totals['audio']} audio"
+    )
+
+
+def _cmd_thumbs(args: argparse.Namespace) -> None:
+    from edittude_v3.media.core import read_json
+
+    inventory = read_json(args.inventory)
+    frames = extract_thumbs(inventory, args.out, count=args.count)
+    print(f"wrote thumbs for {len(frames)} clips under {args.out}")
+
+
+def _cmd_plan(args: argparse.Namespace) -> None:
+    from edittude_v3.media.core import read_json
+
+    inventory = read_json(args.inventory)
+    edl = first_cut(
+        inventory,
+        title=args.title,
+        aspect=args.aspect,
+        look=args.look,
+        target=args.target,
+    )
+    save_edl(edl, args.out)
+    print(f"wrote {args.out}  {len(edl.events)} events, {edl.duration():.2f}s")
+
+
+def _cmd_assemble(args: argparse.Namespace) -> None:
+    edl = load_edl(args.edl)
+    work = args.work or args.out.parent / "work"
+    assemble(edl, args.out, work)
+    print(f"wrote {args.out}")
+
+
+def _cmd_mix(args: argparse.Namespace) -> None:
+    mix(
+        args.video,
+        args.out,
+        voiceover=args.vo,
+        music=args.music,
+        amb_db=args.amb_db,
+        music_db=args.music_db,
+    )
+    print(f"wrote {args.out}")
+
+
+def _cmd_grade(args: argparse.Namespace) -> None:
+    grade(args.video, args.out, args.look)
+    print(f"wrote {args.out}")
+
+
+def _cmd_titles(args: argparse.Namespace) -> None:
+    titles(args.video, args.out, title=args.title, subtitle=args.subtitle)
+    print(f"wrote {args.out}")
+
+
+def _cmd_captions(args: argparse.Namespace) -> None:
+    burn_srt(args.video, args.out, args.srt)
+    print(f"wrote {args.out}")
+
+
+def _cmd_reframe(args: argparse.Namespace) -> None:
+    reframe(args.video, args.out, args.aspect)
+    print(f"wrote {args.out}")
+
+
+def _cmd_finish(args: argparse.Namespace) -> None:
+    finish(args.picture, args.out, edl=load_edl(args.edl))
+    print(f"wrote {args.out}")
+
+
+def _cmd_qc(args: argparse.Namespace) -> None:
+    report = write_review(args.video, args.out)
+    status = "pass" if report["pass"] else "issues"
+    print(f"wrote {args.out}  {status}  {report['duration']:.2f}s  {report['issues']}")
+
+
+def _cmd_frames(args: argparse.Namespace) -> None:
+    frames = grab_frames(args.video, args.out)
+    print(f"wrote {len(frames)} frames under {args.out}")
+
+
+def _cmd_recut(args: argparse.Namespace) -> None:
+    edl = tighten(load_edl(args.edl), drop_longest=args.drop_longest)
+    save_edl(edl, args.out)
+    print(f"wrote {args.out}  {len(edl.events)} events, {edl.duration():.2f}s")
+
+
+def _cmd_proof(args: argparse.Namespace) -> None:
+    evidence = run_proof(
+        args.folder,
+        args.out,
+        title=args.title,
+        subtitle=args.subtitle,
+        aspect=args.aspect,
+        look=args.look,
+        thumbs=not args.no_thumbs,
+    )
+    write_json(args.out / "evidence.json", evidence)
+    print(f"final {evidence['final']}  {evidence['duration']}s  pass={evidence['pass']}")

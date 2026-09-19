@@ -1,0 +1,15 @@
+.venv/
+.env
+/Untitled
+.edittude-v3/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+/artifacts/
+*.mp4
+*.mov
+*.MOV
+*.m4a

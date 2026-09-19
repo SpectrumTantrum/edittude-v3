@@ -1,0 +1,2 @@
+# Only validate.py needs this; smoke_media.py uses the Python standard library.
+PyYAML>=6,<7
