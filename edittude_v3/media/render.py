@@ -15,22 +15,48 @@ from edittude_v3.media.inventory import describe_clip
 from edittude_v3.media.titlecard import write_title_png
 
 
-def scale_filter(width: int, height: int, fps: int | None = 30) -> str:
-    fps_filter = f"fps={fps}," if fps is not None else ""
-    return (
-        f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},{fps_filter}setsar=1,setpts=PTS-STARTPTS,format=yuv420p"
-    )
+def scale_filter(
+    width: int,
+    height: int,
+    fit: str = "pad",
+    zoom: float = 1.0,
+    cx: float = 0.5,
+    cy: float = 0.5,
+    fps: int | None = 30,
+) -> str:
+    if fit == "pad":
+        vf = (
+            f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+            f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black"
+        )
+    elif fit == "crop":
+        vf = (
+            f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height}"
+        )
+    else:
+        raise MediaError(f"unknown fit {fit}. use pad or crop")
+    if zoom > 1:
+        vf = (
+            f"crop=iw/{zoom:g}:ih/{zoom:g}:"
+            f"min(max(iw*{cx:g}-iw/{zoom:g}/2\\,0)\\,iw-iw/{zoom:g}):"
+            f"min(max(ih*{cy:g}-ih/{zoom:g}/2\\,0)\\,ih-ih/{zoom:g}),"
+            + vf
+        )
+    if fps is not None:
+        vf += f",fps={fps}"
+    return vf + ",setsar=1,setpts=PTS-STARTPTS,format=yuv420p"
 
 
 def assemble(edl: EditDecision, out: Path, work_dir: Path) -> Path:
     if not edl.events:
         raise MediaError("EDL has no events")
     work_dir.mkdir(parents=True, exist_ok=True)
+    width, height = edl.width, edl.height
     segments: list[Path] = []
     for index, event in enumerate(edl.events):
         dest = work_dir / f"seg_{index:03d}.mp4"
-        _encode_event(event, dest, edl.width, edl.height, fps=int(edl.fps or 30))
+        _encode_event(event, dest, width, height, edl.fit, fps=int(edl.fps or 30))
         segments.append(dest)
     listing = work_dir / "concat.txt"
     lines = ["file '" + str(seg.resolve()).replace("'", "'\\''") + "'" for seg in segments]
@@ -60,7 +86,7 @@ def assemble(edl: EditDecision, out: Path, work_dir: Path) -> Path:
     return out
 
 
-def _encode_event(event: Event, dest: Path, width: int, height: int, fps: int = 30) -> None:
+def _encode_event(event: Event, dest: Path, width: int, height: int, fit: str = "pad", fps: int = 30) -> None:
     src = Path(event.src)
     if not src.is_file():
         raise MediaError(f"missing source {src}")
@@ -68,7 +94,7 @@ def _encode_event(event: Event, dest: Path, width: int, height: int, fps: int = 
     if duration <= 0.04:
         raise MediaError(f"event too short: {event}")
     clip = describe_clip(src)
-    vf = scale_filter(width, height, fps=fps)
+    vf = scale_filter(width, height, fit=fit, zoom=event.zoom, cx=event.cx, cy=event.cy, fps=fps)
     args = [
         "-ss",
         f"{event.in_point:.3f}",
@@ -235,8 +261,8 @@ def titles(
     if not video.is_file():
         raise MediaError(f"missing video {video}")
     meta = describe_clip(video)
-    width = int(meta.get("width") or 1920)
-    height = int(meta.get("height") or 1080)
+    width = int(meta.get("display_width") or 1920)
+    height = int(meta.get("display_height") or 1080)
     card = out.parent / "title-card.png"
     write_title_png(card, title, width=width, height=height, subtitle=subtitle)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -297,11 +323,11 @@ def burn_srt(video: Path, out: Path, srt: Path) -> Path:
     return _video_filter(video, out, vf)
 
 
-def reframe(video: Path, out: Path, aspect: str) -> Path:
+def reframe(video: Path, out: Path, aspect: str, fit: str = "crop") -> Path:
     if aspect not in ASPECTS:
         raise MediaError(f"unknown aspect {aspect}. use {', '.join(ASPECTS)}")
     width, height = ASPECTS[aspect]
-    return _video_filter(video, out, scale_filter(width, height, fps=None))
+    return _video_filter(video, out, scale_filter(width, height, fit=fit, fps=None))
 
 
 def finish(

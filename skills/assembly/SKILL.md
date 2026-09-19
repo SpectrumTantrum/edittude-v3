@@ -11,7 +11,7 @@ Turn the EDL into a picture file. Do not hand-write concat lists.
 edittude-v3 media assemble edl.json --out picture.mp4 --work OUT/work
 ```
 
-The command re-encodes each event to the EDL aspect at 30fps, stereo 48k, then concat-copies. iPhone extra data streams stay off the map.
+The command re-encodes each event onto the EDL canvas at 30fps, stereo 48k, then concat-copies. With `"aspect": "source"` that canvas is the display resolution of the clip holding the most screen time; off-aspect events are padded onto it unless `"fit"` is `"crop"`. Per-event `zoom`/`cx`/`cy` is applied here too. iPhone extra data streams stay off the map.
 
 If the EDL already has title, look, and voiceover paths, prefer `finish` after assemble instead of stacking one-off encodes.
 

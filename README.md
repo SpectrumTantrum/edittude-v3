@@ -1,6 +1,6 @@
 # edittude-v3
 
-Local video-editing agent. Model is DeepSeek Flash.
+Video-editing agent. Model is DeepSeek Flash.
 
 It inventories a footage folder, plans a cut, renders with ffmpeg, mixes voiceover, grades, titles, then QCs. You do not have to supply an EDL.
 
@@ -14,7 +14,7 @@ That installs `uv` if needed, syncs the project, and puts `edittude-v3` in `~/.l
 
 ffmpeg and ffprobe must be on PATH. On a Mac: `brew install ffmpeg`.
 
-First launch asks for a DeepSeek API key and writes it to `~/.config/edittude-v3/.env`. Get a key from https://platform.deepseek.com. That file is the only place the app looks, besides `DEEPSEEK_API_KEY` already in the environment.
+First launch asks for a DeepSeek API key and writes it to `~/.config/edittude-v3/.env`. Get a key from [https://platform.deepseek.com](https://platform.deepseek.com). That file is the only place the app looks, besides `DEEPSEEK_API_KEY` already in the environment.
 
 ## CLI
 
@@ -37,6 +37,8 @@ From a checkout without the installer:
 uv sync
 uv run edittude-v3
 ```
+
+
 
 ## Media tools
 
@@ -66,17 +68,19 @@ edittude-media models install --check               # status only, no network
 
 That creates a separate `.venv-models` (Python 3.11, torch) beside the install and puts weights in `models/`; the agent's own virtualenv is untouched. Budget about 2.5 GB for the torch runtime plus the weights for whichever backends you pick. Override locations with `EDITTUDE_MODELS_DIR`, `EDITTUDE_MODEL_PYTHON`, or the per-backend `EDITTUDE_*` variables.
 
-| backend | tool | weights | notes |
-| --- | --- | --- | --- |
-| `asr` | `speech_transcribe` | ~0.15 GB | default |
-| `separation` | `audio_separate` | ~0.1-0.35 GB | default |
-| `seed-vc` | `voice_convert` | ~2.5 GB | explicit opt-in |
-| `diffsinger` | `singing_synthesize` | ~0.5 GB | explicit opt-in, Mandarin only |
+
+| backend      | tool                 | weights      | notes                          |
+| ------------ | -------------------- | ------------ | ------------------------------ |
+| `asr`        | `speech_transcribe`  | ~0.15 GB     | default                        |
+| `separation` | `audio_separate`     | ~0.1-0.35 GB | default                        |
+| `seed-vc`    | `voice_convert`      | ~2.5 GB      | explicit opt-in                |
+| `diffsinger` | `singing_synthesize` | ~0.5 GB      | explicit opt-in, Mandarin only |
+
 
 `seed-vc` and `diffsinger` stay out of the default list because they are large and their licences are not this repo's:
 
 - **Seed-VC is GPL-3.0.** The installer clones it from upstream at a pinned commit into `models/seed-vc` and applies `tools/patches/seed-vc.patch`; nothing of it is vendored into this MIT repo. Your use of `voice_convert` is subject to the GPL.
-- **DiffSinger is MIT, but its `0228_opencpop_ds100_rel` checkpoint is trained on Opencpop (CC BY-NC-ND 4.0) and is therefore non-commercial only.** The installer prints this when you install `diffsinger`. `singing_synthesize` sings Mandarin and nothing else.
+- **DiffSinger is MIT, but its** `0228_opencpop_ds100_rel` **checkpoint is trained on Opencpop (CC BY-NC-ND 4.0) and is therefore non-commercial only.** The installer prints this when you install `diffsinger`. `singing_synthesize` sings Mandarin and nothing else.
 
 Both are fetched at install time and never committed. Everything runs offline afterwards.
 
@@ -93,6 +97,8 @@ ctrl+d                quit
 ↑ / ↓                 history
 ```
 
+
+
 ## Slash commands
 
 ```
@@ -103,6 +109,8 @@ ctrl+d                quit
 /clear    clear the transcript
 /quit     exit
 ```
+
+
 
 ## Skills
 

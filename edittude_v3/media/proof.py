@@ -17,7 +17,8 @@ def run_proof(
     *,
     title: str = "A DAY OUT",
     subtitle: str = "",
-    aspect: str = "16:9",
+    aspect: str = "source",
+    fit: str = "pad",
     look: str = "warm",
     thumbs: bool = True,
 ) -> dict[str, Any]:
@@ -27,7 +28,7 @@ def run_proof(
     thumb_report: list[dict[str, Any]] = []
     if thumbs:
         thumb_report = extract_thumbs(inventory, out_dir / "thumbs")
-    edl = first_cut(inventory, title=title, aspect=aspect, look=look)
+    edl = first_cut(inventory, title=title, aspect=aspect, fit=fit, look=look)
     if subtitle:
         edl.subtitle = subtitle
     edl_path = out_dir / "edl.json"

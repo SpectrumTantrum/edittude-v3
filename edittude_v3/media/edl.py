@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
+from math import isnan
 from pathlib import Path
 from typing import Any
 
@@ -19,17 +20,36 @@ class Event:
     in_point: float
     out_point: float
     reason: str = ""
+    zoom: float = 1.0
+    cx: float = 0.5
+    cy: float = 0.5
+
+    def __post_init__(self) -> None:
+        for name, default, lower, upper in (
+            ("zoom", 1.0, 1.0, 4.0),
+            ("cx", 0.5, 0.0, 1.0),
+            ("cy", 0.5, 0.0, 1.0),
+        ):
+            try:
+                value = float(getattr(self, name))
+            except (OverflowError, TypeError, ValueError):
+                value = default
+            setattr(self, name, default if isnan(value) else min(upper, max(lower, value)))
 
     def duration(self) -> float:
         return max(0.0, self.out_point - self.in_point)
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "src": self.src,
             "in": round(self.in_point, 3),
             "out": round(self.out_point, 3),
             "reason": self.reason,
         }
+        for name, default in (("zoom", 1.0), ("cx", 0.5), ("cy", 0.5)):
+            if getattr(self, name) != default:
+                data[name] = getattr(self, name)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Event:
@@ -38,7 +58,29 @@ class Event:
             in_point=float(data.get("in") or data.get("in_point") or 0),
             out_point=float(data.get("out") or data.get("out_point") or 0),
             reason=str(data.get("reason") or ""),
+            zoom=data.get("zoom", 1.0),
+            cx=data.get("cx", 0.5),
+            cy=data.get("cy", 0.5),
         )
+
+
+def source_canvas(events: list[Event]) -> tuple[int, int]:
+    """Use display size by greatest total event duration, ties first; round down even."""
+    from edittude_v3.media.inventory import describe_clip
+
+    durations: dict[str, float] = {}
+    for event in events:
+        durations[event.src] = durations.get(event.src, 0.0) + event.duration()
+    for src in sorted(durations, key=lambda src: durations[src], reverse=True):
+        try:
+            clip = describe_clip(Path(src))
+            width = int(clip.get("display_width") or 0) // 2 * 2
+            height = int(clip.get("display_height") or 0) // 2 * 2
+        except (MediaError, OSError, TypeError, ValueError):
+            continue
+        if clip.get("has_video", True) and width > 0 and height > 0:
+            return width, height
+    return 1920, 1080
 
 
 @dataclass
@@ -46,20 +88,42 @@ class EditDecision:
     events: list[Event] = field(default_factory=list)
     title: str = ""
     subtitle: str = ""
-    aspect: str = "16:9"
+    aspect: str = "source"
     look: str = "warm"
     fps: int = 30
     voiceover: str | None = None
     music: str | None = None
     notes: str = ""
+    canvas_width: int | None = None
+    canvas_height: int | None = None
+    fit: str = "pad"
+
+    def __post_init__(self) -> None:
+        if self.fit not in ("pad", "crop"):
+            raise MediaError("fit must be pad or crop")
+        if self.aspect == "source":
+            for size in (self.canvas_width, self.canvas_height):
+                if size is not None and size <= 0:
+                    raise MediaError("source canvas dimensions must be positive")
+
+    def _canvas(self) -> tuple[int, int]:
+        if self.aspect != "source":
+            return ASPECTS.get(self.aspect, ASPECTS["16:9"])
+        if self.canvas_width is None or self.canvas_height is None:
+            width, height = source_canvas(self.events)
+            if self.canvas_width is None:
+                self.canvas_width = width
+            if self.canvas_height is None:
+                self.canvas_height = height
+        return self.canvas_width, self.canvas_height
 
     @property
     def width(self) -> int:
-        return ASPECTS.get(self.aspect, ASPECTS["16:9"])[0]
+        return self._canvas()[0]
 
     @property
     def height(self) -> int:
-        return ASPECTS.get(self.aspect, ASPECTS["16:9"])[1]
+        return self._canvas()[1]
 
     def duration(self) -> float:
         return sum(event.duration() for event in self.events)
@@ -70,6 +134,7 @@ class EditDecision:
             "title": self.title,
             "subtitle": self.subtitle,
             "aspect": self.aspect,
+            "fit": self.fit,
             "look": self.look,
             "fps": self.fps,
             "width": self.width,
@@ -104,11 +169,15 @@ def edl_from_dict(data: dict[str, Any]) -> EditDecision:
         if event.in_point >= event.out_point:
             raise MediaError(f"EDL event {index}: in must be less than out")
         events.append(event)
+    aspect = str(data.get("aspect") or "source")
     return EditDecision(
         events=events,
         title=str(data.get("title") or ""),
         subtitle=str(data.get("subtitle") or ""),
-        aspect=str(data.get("aspect") or "16:9"),
+        aspect=aspect,
+        canvas_width=int(data["width"]) if aspect == "source" and data.get("width") is not None else None,
+        canvas_height=int(data["height"]) if aspect == "source" and data.get("height") is not None else None,
+        fit=str(data.get("fit") or "pad"),
         look=str(data.get("look") or "warm"),
         fps=int(data.get("fps") or 30),
         voiceover=data.get("voiceover"),
@@ -159,7 +228,8 @@ def first_cut(
     inventory: dict[str, Any],
     *,
     title: str = "",
-    aspect: str = "16:9",
+    aspect: str = "source",
+    fit: str = "pad",
     look: str = "warm",
     target: float | None = None,
 ) -> EditDecision:
@@ -203,7 +273,8 @@ def first_cut(
     return EditDecision(
         events=events,
         title=title,
-        aspect=aspect if aspect in ASPECTS else "16:9",
+        aspect=aspect if aspect in ASPECTS or aspect == "source" else "source",
+        fit=fit,
         look=look if look in LOOKS else "warm",
         voiceover=voiceover["path"] if voiceover else None,
         music=music["path"] if music else None,
@@ -225,9 +296,7 @@ def fit_to_duration(events: list[Event], target: float) -> list[Event]:
 
 
 def tighten(edl: EditDecision, *, drop_longest: bool = False) -> EditDecision:
-    events = [
-        Event(event.src, event.in_point, event.out_point, event.reason) for event in edl.events
-    ]
+    events = [replace(event) for event in edl.events]
     if drop_longest and len(events) > 4:
         longest = max(range(len(events)), key=lambda i: events[i].duration())
         if events[longest].duration() > 3.5 and 0 < longest < len(events) - 1:

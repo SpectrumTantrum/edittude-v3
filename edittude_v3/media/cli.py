@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from edittude_v3.media.core import LOOKS, MediaError, write_json
+from edittude_v3.media.core import ASPECTS, LOOKS, MediaError, write_json
 from edittude_v3.media.edl import first_cut, load_edl, save_edl, tighten
 from edittude_v3.media.inventory import extract_thumbs, write_inventory
 from edittude_v3.media.proof import run_proof
@@ -57,7 +57,10 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("inventory", type=Path)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--title", default="")
-    p.add_argument("--aspect", default="16:9")
+    p.add_argument("--aspect", default="source", choices=("source", *ASPECTS),
+                   help="canvas size; source keeps the dominant clip's display resolution")
+    p.add_argument("--fit", default="pad", choices=("pad", "crop"),
+                   help="pad off-aspect shots or crop them to fill the canvas")
     p.add_argument("--look", default="warm", choices=sorted(LOOKS))
     p.add_argument("--target", type=float)
     p.set_defaults(func=_cmd_plan)
@@ -99,10 +102,11 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, required=True)
     p.set_defaults(func=_cmd_captions)
 
-    p = sub.add_parser("reframe", help="crop to 16:9, 9:16, or 1:1")
+    p = sub.add_parser("reframe", help="reframe to 16:9, 9:16, or 1:1")
     p.add_argument("video", type=Path)
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--aspect", required=True, choices=("16:9", "9:16", "1:1"))
+    p.add_argument("--fit", default="crop", choices=("pad", "crop"))
     p.set_defaults(func=_cmd_reframe)
 
     p = sub.add_parser("finish", help="grade + title + mix in one encode")
@@ -132,7 +136,10 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, required=True)
     p.add_argument("--title", default="A DAY OUT")
     p.add_argument("--subtitle", default="")
-    p.add_argument("--aspect", default="16:9")
+    p.add_argument("--aspect", default="source", choices=("source", *ASPECTS),
+                   help="canvas size; source keeps the dominant clip's display resolution")
+    p.add_argument("--fit", default="pad", choices=("pad", "crop"),
+                   help="pad off-aspect shots or crop them to fill the canvas")
     p.add_argument("--look", default="warm")
     p.add_argument("--no-thumbs", action="store_true")
     p.set_defaults(func=_cmd_proof)
@@ -171,6 +178,7 @@ def _cmd_plan(args: argparse.Namespace) -> None:
         inventory,
         title=args.title,
         aspect=args.aspect,
+        fit=args.fit,
         look=args.look,
         target=args.target,
     )
@@ -224,7 +232,7 @@ def _cmd_captions(args: argparse.Namespace) -> None:
 
 def _cmd_reframe(args: argparse.Namespace) -> None:
     _guard_output(args.out, args.force)
-    reframe(args.video, args.out, args.aspect)
+    reframe(args.video, args.out, args.aspect, fit=args.fit)
     print(f"wrote {args.out}")
 
 
@@ -275,6 +283,7 @@ def _cmd_proof(args: argparse.Namespace) -> None:
         title=args.title,
         subtitle=args.subtitle,
         aspect=args.aspect,
+        fit=args.fit,
         look=args.look,
         thumbs=not args.no_thumbs,
     )
