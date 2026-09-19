@@ -501,4 +501,8 @@ def _db(db: float) -> str:
 
 def _escape_filter_path(path: Path) -> str:
     text = str(path.resolve())
-    return text.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    # ffmpeg unescapes the filtergraph first, then the filter option, so escape
+    # for the option level first and for the filtergraph around it second.
+    for special in ("\\':=", "\\'[],;"):
+        text = "".join("\\" + char if char in special else char for char in text)
+    return text

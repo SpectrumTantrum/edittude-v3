@@ -15,4 +15,6 @@ edittude-v3 media titles picture.mp4 --out titled.mp4 --title "A DAY OUT" --subt
 
 Set `title` and `subtitle` on the EDL and use `finish` when you still have grade and mix to do.
 
+Title and subtitle are uppercased before drawing. Only A-Z, 0-9, space, `-`, `'`, `.` and `/` have glyphs; anything else raises before the card is written. Punctuate around that, or drop the character.
+
 Completion: the words are readable on a 1080p frame and gone by about 3.5s.

@@ -8,6 +8,7 @@ from edittude_v3.media.core import (
     AUDIO_EXTS,
     SKIP_DIRS,
     VIDEO_EXTS,
+    MediaError,
     ffmpeg,
     ffprobe,
     parse_fps,
@@ -136,15 +137,14 @@ def extract_thumbs(
     out_dir.mkdir(parents=True, exist_ok=True)
     positions = _thumb_positions(count)
     written: list[dict[str, Any]] = []
-    for clip in inventory.get("clips") or []:
+    for clip_index, clip in enumerate(inventory.get("clips") or []):
         if clip.get("kind") != "video":
             continue
         src = Path(clip["path"])
         duration = float(clip.get("duration") or 0)
         if duration <= 0 or not src.is_file():
             continue
-        stem = src.stem
-        clip_dir = out_dir / stem
+        clip_dir = out_dir / f"{clip_index:03d}_{src.stem}"
         clip_dir.mkdir(parents=True, exist_ok=True)
         frames: list[str] = []
         for index, frac in enumerate(positions):
@@ -173,8 +173,10 @@ def extract_thumbs(
 
 
 def _thumb_positions(count: int) -> list[float]:
-    if count <= 1:
+    if count < 1:
+        raise MediaError(f"thumb count must be at least 1, got {count}")
+    if count == 1:
         return [0.5]
     if count == 2:
         return [0.2, 0.8]
-    return [0.12, 0.5, 0.88][:count]
+    return [0.12 + 0.76 * index / (count - 1) for index in range(count)]
