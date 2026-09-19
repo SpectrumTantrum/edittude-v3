@@ -120,7 +120,8 @@ def _run(args: list[str | Path]) -> None:
 
 def _venv(deps: list[str]) -> None:
     python = model_python()
-    if not python.is_file():
+    # An override names an interpreter we do not own: install into it, never venv over it.
+    if not os.environ.get("EDITTUDE_MODEL_PYTHON") and not python.is_file():
         print(f"creating {python.parent.parent}")
         _run([_uv(), "venv", "--python", "3.11", python.parent.parent])
     _run([_uv(), "pip", "install", "--quiet", "--python", python, *deps])
@@ -155,10 +156,14 @@ def _installed_v2(entry: dict) -> tuple[Path, list[str]] | None:
     non-f0 checkpoint), so matching the revision alone picks the wrong weights.
     """
     for manifest in sorted(V2_MODELS.glob("*/.edittude-model.json")):
-        record = json.loads(manifest.read_text(encoding="utf-8"))
-        if record.get("revision") != entry["rev"]:
+        # Another app owns this directory, so one unreadable manifest must not stop the install.
+        try:
+            record = json.loads(manifest.read_text(encoding="utf-8"))
+            if record["revision"] != entry["rev"]:
+                continue
+            names = _wanted(record["files"], entry.get("files"))
+        except (OSError, ValueError, KeyError, TypeError):
             continue
-        names = _wanted(record["files"], entry.get("files"))
         if names:
             return manifest.parent, names
     return None

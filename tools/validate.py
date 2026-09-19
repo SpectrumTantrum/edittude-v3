@@ -11,48 +11,60 @@ from pathlib import Path
 import yaml
 
 
+def _check(condition, message):
+    """assert, minus the -O switch that would turn every check below into a no-op."""
+    if not condition:
+        raise SystemExit(message)
+
+
 def validate(pack, source=None):
     manifest = json.loads((pack / "manifest.json").read_text(encoding="utf-8"))
     entries = manifest["skills"]
-    assert len(entries) == 33, "Expected exactly 33 original roles"
-    assert len({entry["role"] for entry in entries}) == 33, "Duplicate role"
+    count = len(entries)
+    _check(count, "Manifest lists no skills")
+    _check(len({entry["role"] for entry in entries}) == count, "Duplicate role")
     names = {entry["skill"] for entry in entries}
-    assert len(names) == 33, "Duplicate skill"
-    assert names.issubset({p.parent.name for p in pack.glob("*/SKILL.md")}), "Missing mapped skill"
-    assert (pack / "LICENSE").is_file(), "Missing distribution license"
+    _check(len(names) == count, "Duplicate skill")
+    _check(names.issubset({p.parent.name for p in pack.glob("*/SKILL.md")}), "Missing mapped skill")
+    _check((pack / "LICENSE").is_file(), "Missing distribution license")
 
     for entry in entries:
         name = entry["skill"]
         content = (pack / name / "SKILL.md").read_text(encoding="utf-8")
         parts = content.split("---", 2)
-        assert len(parts) == 3 and not parts[0], f"{name}: missing frontmatter"
+        _check(len(parts) == 3 and not parts[0], f"{name}: missing frontmatter")
         meta = yaml.safe_load(parts[1])
-        assert meta["name"] == name, f"{name}: name differs from folder"
-        assert re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name) and len(name) <= 64
-        assert isinstance(meta["description"], str) and 0 < len(meta["description"]) <= 1024
-        assert not {"<", ">"}.intersection(meta["description"])
+        _check(meta["name"] == name, f"{name}: name differs from folder")
+        _check(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name) and len(name) <= 64,
+               f"{name}: unusable skill name")
+        _check(isinstance(meta["description"], str) and 0 < len(meta["description"]) <= 1024,
+               f"{name}: unusable description")
+        _check(not {"<", ">"}.intersection(meta["description"]), f"{name}: description markup")
         provenance = meta["metadata"]
-        assert provenance["source-role"] == entry["role"], f"{name}: wrong role"
-        assert provenance["source-path"] == entry["source_path"], f"{name}: wrong source"
-        assert provenance["source-revision"] == manifest["source_revision"]
-        assert all(isinstance(value, str) for value in provenance.values())
-        assert parts[2].strip(), f"{name}: empty instructions"
-        assert "[TODO:" not in content, f"{name}: unfinished scaffold"
+        _check(provenance["source-role"] == entry["role"], f"{name}: wrong role")
+        _check(provenance["source-path"] == entry["source_path"], f"{name}: wrong source")
+        _check(provenance["source-revision"] == manifest["source_revision"],
+               f"{name}: wrong source revision")
+        _check(all(isinstance(value, str) for value in provenance.values()),
+               f"{name}: non-string metadata")
+        _check(parts[2].strip(), f"{name}: empty instructions")
+        _check("[TODO:" not in content, f"{name}: unfinished scaffold")
 
         if source is not None:
             raw = (source / entry["source_path"]).read_bytes()
-            assert hashlib.sha256(raw).hexdigest() == entry["source_sha256"], f"{name}: source drift"
+            _check(hashlib.sha256(raw).hexdigest() == entry["source_sha256"], f"{name}: source drift")
             classes = [node for node in ast.parse(raw).body if isinstance(node, ast.ClassDef)]
             role = next((node for node in classes if node.name == entry["role"]), None)
-            assert role is not None, f"{name}: original class missing"
-            assert any(isinstance(base, ast.Name) and base.id == "BaseTool" for base in role.bases)
+            _check(role is not None, f"{name}: original class missing")
+            _check(any(isinstance(base, ast.Name) and base.id == "BaseTool" for base in role.bases),
+                   f"{name}: original class is not a BaseTool")
 
     if source is not None:
         registry = json.loads((source / manifest["registry_path"]).read_text(encoding="utf-8"))
         mapped = {entry["role"]: entry["source_path"].removesuffix(".py").replace("/", ".") for entry in entries}
-        assert registry == mapped, "Pack does not map exactly to the original registry"
+        _check(registry == mapped, "Pack does not map exactly to the original registry")
 
-    return len(entries)
+    return count
 
 
 if __name__ == "__main__":

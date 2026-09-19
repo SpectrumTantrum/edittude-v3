@@ -4,6 +4,8 @@ import struct
 import zlib
 from pathlib import Path
 
+from edittude_v3.media.core import MediaError
+
 # 5x7 uppercase glyphs, bit rows. Enough for a title card without libfreetype.
 _GLYPHS: dict[str, tuple[str, ...]] = {
     "A": ("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
@@ -58,6 +60,12 @@ def write_title_png(
     height: int,
     subtitle: str = "",
 ) -> Path:
+    unsupported = set(title.upper() + subtitle.upper()) - _GLYPHS.keys()
+    if unsupported:
+        raise MediaError(
+            f"no glyph for {''.join(sorted(unsupported))!r}. "
+            f"titles are uppercased and limited to {''.join(_GLYPHS)!r}"
+        )
     pixels = bytearray(width * height * 4)
     _fill_bar(pixels, width, height, y0=int(height * 0.70), y1=int(height * 0.94), rgba=b"\x00\x00\x00\x99")
     _blit_line(pixels, width, height, title.upper(), y_frac=0.78, scale=_scale(width, title, 0.70))
@@ -106,7 +114,7 @@ def _blit_line(
     y0 = max(0, int(height * y_frac) - text_h // 2)
     dots: list[tuple[int, int]] = []
     for index, char in enumerate(text):
-        rows = _GLYPHS.get(char) or _GLYPHS[" "]
+        rows = _GLYPHS[char]
         origin_x = x0 + index * glyph_w * scale
         for gy, row in enumerate(rows):
             for gx, bit in enumerate(row):
