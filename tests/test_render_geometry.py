@@ -151,7 +151,9 @@ class RenderGeometryTests(unittest.TestCase):
             vf = render.call_args.args[2]
         self.assertIn("force_original_aspect_ratio=increase,crop=1080:1920", vf)
         self.assertNotIn("fps=", vf)
-        self.assertTrue(vf.endswith("setsar=1,setpts=PTS-STARTPTS,format=yuv420p"))
+        # reframe copies audio untouched, so it must not shift video timestamps.
+        self.assertNotIn("setpts", vf)
+        self.assertTrue(vf.endswith("setsar=1,format=yuv420p"))
 
     def test_titles_use_display_dimensions(self):
         with tempfile.TemporaryDirectory() as folder:

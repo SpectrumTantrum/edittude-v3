@@ -23,6 +23,7 @@ def scale_filter(
     cx: float = 0.5,
     cy: float = 0.5,
     fps: int | None = 30,
+    reset_pts: bool = True,
 ) -> str:
     if fit == "pad":
         vf = (
@@ -45,7 +46,9 @@ def scale_filter(
         )
     if fps is not None:
         vf += f",fps={fps}"
-    return vf + ",setsar=1,setpts=PTS-STARTPTS,format=yuv420p"
+    # Segments restart at 0 for concat. A whole-file filter must not: its audio is copied as is.
+    pts = ",setpts=PTS-STARTPTS" if reset_pts else ""
+    return vf + f",setsar=1{pts},format=yuv420p"
 
 
 def assemble(edl: EditDecision, out: Path, work_dir: Path) -> Path:
@@ -327,7 +330,7 @@ def reframe(video: Path, out: Path, aspect: str, fit: str = "crop") -> Path:
     if aspect not in ASPECTS:
         raise MediaError(f"unknown aspect {aspect}. use {', '.join(ASPECTS)}")
     width, height = ASPECTS[aspect]
-    return _video_filter(video, out, scale_filter(width, height, fit=fit, fps=None))
+    return _video_filter(video, out, scale_filter(width, height, fit=fit, fps=None, reset_pts=False))
 
 
 def finish(
