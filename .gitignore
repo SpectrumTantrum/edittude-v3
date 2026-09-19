@@ -1,4 +1,6 @@
 .venv/
+.venv-models/
+/models/
 .env
 /Untitled
 .edittude-v3/

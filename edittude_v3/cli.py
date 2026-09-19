@@ -18,7 +18,11 @@ from rich.table import Table
 from edittude_v3 import __version__
 from edittude_v3.agent import (
     API_KEY_URL,
-    MODEL_LABEL,
+    SETTINGS,
+    get_settings,
+    model_label,
+    model_name,
+    set_setting,
     build_agent,
     configured_api_key,
     default_workspace,
@@ -28,7 +32,7 @@ from edittude_v3.agent import (
     save_api_key,
 )
 from edittude_v3.events import iter_turn, preview
-from edittude_v3.paths import install_root
+from edittude_v3.paths import env_file, install_root
 from edittude_v3.skills import list_skills
 from edittude_v3.tools import list_tool_names
 from edittude_v3.tui import ACCENT, run_tui
@@ -68,6 +72,11 @@ def _parser() -> argparse.ArgumentParser:
     sub.add_parser("skills", help="list skill folders in ./skills", parents=[common])
     sub.add_parser("tools", help="list callable tools in ./tools", parents=[common])
 
+    config = sub.add_parser("config", help="show or change models and limits")
+    config.add_argument("action", nargs="?", choices=("show", "set", "unset"), default="show")
+    config.add_argument("name", nargs="?", choices=tuple(SETTINGS))
+    config.add_argument("value", nargs="?")
+
     media = sub.add_parser("media", help="local ffmpeg tools (inventory, cut, mix, qc)")
     media.add_argument(
         "media_args",
@@ -96,7 +105,7 @@ def _home(path: Path) -> str:
 
 
 def ensure_api_key() -> None:
-    if configured_api_key():
+    if configured_api_key() or not model_name().startswith("deepseek:"):
         return
     if not sys.stdin.isatty():
         require_api_key()
@@ -128,7 +137,7 @@ async def _ask_async(prompt: str, workspace: Path, thread: str) -> None:
     agent = build_agent(workspace=workspace)
     parts: list[str] = []
     home = escape(_home(workspace))
-    console.print(f"[bold {ACCENT}]edittude-v3[/][dim] · {MODEL_LABEL} · {home}[/]")
+    console.print(f"[bold {ACCENT}]edittude-v3[/][dim] · {model_label()} · {home}[/]")
     console.print()
 
     with Status("thinking", console=console, spinner="dots", spinner_style=ACCENT):
@@ -184,6 +193,22 @@ def cmd_tools(*, workspace: Path) -> None:
     console.print(table)
 
 
+def cmd_config(*, action: str, name: str | None, value: str | None) -> None:
+    load_env()
+    if action != "show":
+        if name is None or (action == "set" and value is None):
+            raise SystemExit("usage: edittude-v3 config set NAME VALUE | config unset NAME")
+        set_setting(name, value if action == "set" else None)
+    table = Table(show_header=True, header_style=f"bold {ACCENT}")
+    for column in ("setting", "value", "variable"):
+        table.add_column(column)
+    for setting, current in get_settings().items():
+        shown = "set" if current and setting.endswith("key") else current
+        table.add_row(setting, escape(shown), SETTINGS[setting][0])
+    console.print(table)
+    console.print(f"[dim]{escape(_home(env_file()))}[/]")
+
+
 def cmd_update(*, force: bool = False) -> None:
     root = install_root()
     installer = root / "install.sh"
@@ -233,6 +258,9 @@ def main(argv: list[str] | None = None) -> None:
         if not media_args:
             media_args = ["--help"]
         media_main(media_args)
+        return
+    if args.command == "config":
+        cmd_config(action=args.action, name=args.name, value=args.value)
         return
     if args.command == "update":
         cmd_update(force=args.force)

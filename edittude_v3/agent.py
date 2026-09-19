@@ -4,15 +4,16 @@ import os
 import re
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv, set_key, unset_key
 from langchain.chat_models import init_chat_model
 from langchain_core.language_models import BaseChatModel
 from langgraph.checkpoint.memory import InMemorySaver
 
 from deepagents import create_deep_agent
-from deepagents.backends import LocalShellBackend
+from deepagents.backends import CompositeBackend, LocalShellBackend
 
-from edittude_v3.paths import PACKAGE_ROOT, env_file, install_root
+from edittude_v3.deepseek_vision import DEEPSEEK_PROFILE, DeepSeekImageMiddleware
+from edittude_v3.paths import PACKAGE_ROOT, env_file, install_root, state_dir
 from edittude_v3.skills import skill_dirs
 from edittude_v3.subagents import video_subagents
 from edittude_v3.tools import load_workspace_tools
@@ -21,6 +22,14 @@ MODEL = "deepseek:deepseek-flash"
 MODEL_LABEL = "DeepSeek Flash"
 API_KEY_ENV = "DEEPSEEK_API_KEY"
 API_KEY_URL = "https://platform.deepseek.com"
+# `edittude-v3 config` names -> variables in env_file(). Defaults shown are what runs when unset.
+SETTINGS = {
+    "model": ("EDITTUDE_MODEL", MODEL),
+    "vision-url": ("EDITTUDE_VISION_URL", "http://localhost:1234/v1"),
+    "vision-model": ("EDITTUDE_VISION_MODEL", "qwen/qwen3.8-27b"),
+    "vision-api-key": ("EDITTUDE_VISION_API_KEY", ""),
+    "recursion-limit": ("EDITTUDE_RECURSION_LIMIT", "400"),
+}
 _API_KEY_LINE = re.compile(rf"^(?:export\s+)?{API_KEY_ENV}=.*$", re.MULTILINE)
 
 SYSTEM_PROMPT = """You are edittude-v3, a local cutter.
@@ -53,6 +62,11 @@ Workflow:
 Delegate with the task tool when it helps: inventory, editor, mixer, qc.
 The general-purpose subagent is for leftover work, not for hiding from a cut.
 
+You can see images. read_file on a jpg or png attaches the real image. Each one
+costs up to 1024 tokens, so extract a contact sheet and read that rather than every
+frame. image_describe stays available for bulk local description. Look before you
+write the EDL: reasons come from what is in the shot, matched to what the voiceover says.
+
 You have a local shell. ffmpeg and ffprobe work. virtual_mode is off on purpose.
 
 The registered portable media tools are also available. Call get_capabilities to
@@ -62,6 +76,33 @@ shell tools use host paths. Resolve returned media paths against the project
 directory before opening them with filesystem tools. Use the existing media CLI
 for footage outside the workspace. Keep originals intact and verify outputs.
 """
+
+
+def model_name() -> str:
+    return os.getenv("EDITTUDE_MODEL", "").strip() or MODEL
+
+
+def model_label() -> str:
+    return MODEL_LABEL if model_name() == MODEL else model_name()
+
+
+def get_settings() -> dict[str, str]:
+    saved = dotenv_values(env_file()) if env_file().is_file() else {}
+    return {name: os.getenv(var) or saved.get(var) or default for name, (var, default) in SETTINGS.items()}
+
+
+def set_setting(name: str, value: str | None) -> None:
+    """Persist to env_file(); value None restores the default."""
+    var = SETTINGS[name][0]
+    path = env_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.touch(mode=0o600)
+    if value is None:
+        unset_key(path, var)
+        os.environ.pop(var, None)
+    else:
+        set_key(path, var, value)
+        os.environ[var] = value
 
 
 def default_workspace() -> Path:
@@ -150,17 +191,32 @@ def require_api_key() -> None:
     )
 
 
+def build_backend(workspace: Path) -> CompositeBackend:
+    """Real host paths for the agent, project-local scratch for offloaded history.
+
+    virtual_mode is off so /Users/... paths are real, which also makes deepagents'
+    default artifacts_root of "/" a literal write to the read-only macOS root.
+    """
+    return CompositeBackend(
+        default=LocalShellBackend(
+            root_dir=workspace,
+            virtual_mode=False,
+            inherit_env=True,
+            timeout=600,
+        ),
+        routes={},
+        artifacts_root=str(state_dir(workspace)),
+    )
+
+
 def build_agent(*, workspace: Path | None = None, model: BaseChatModel | None = None):
     workspace = (workspace or default_workspace()).expanduser().resolve()
     if model is None:
-        require_api_key()
-        model = init_chat_model(MODEL)
-    backend = LocalShellBackend(
-        root_dir=workspace,
-        virtual_mode=False,
-        inherit_env=True,
-        timeout=600,
-    )
+        deepseek = model_name().startswith("deepseek:")
+        if deepseek:
+            require_api_key()
+        model = init_chat_model(model_name(), **({"profile": DEEPSEEK_PROFILE} if deepseek else {}))
+    backend = build_backend(workspace)
 
     memory_files: list[str] = []
     for path in (install_root() / "AGENTS.md", workspace / "AGENTS.md"):
@@ -181,6 +237,7 @@ def build_agent(*, workspace: Path | None = None, model: BaseChatModel | None = 
         skills=skills,
         backend=backend,
         subagents=subagents,
+        middleware=[DeepSeekImageMiddleware()],
         checkpointer=InMemorySaver(),
         name="edittude-v3",
     )

@@ -26,6 +26,13 @@ def env_file() -> Path:
     return config_home() / ".env"
 
 
+def state_dir(workspace: Path) -> Path:
+    """Per-project scratch: TUI history, offloaded conversation history, media."""
+    path = workspace.expanduser().resolve() / ".edittude-v3"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def unique_existing_dirs(*candidates: Path) -> list[Path]:
     found: list[Path] = []
     seen: set[Path] = set()

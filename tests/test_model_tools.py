@@ -61,6 +61,8 @@ class ModelToolsTest(unittest.TestCase):
 
     def test_missing_model_configuration_is_explicit(self):
         missing = {key: "" for key in ("EDITTUDE_DEMUCS_REPO", "EDITTUDE_DIFFSINGER_DIR", "EDITTUDE_SEED_VC_DIR")}
+        # Keep a real install under the repo's models/ from satisfying the defaults.
+        missing["EDITTUDE_MODELS_DIR"] = str(self.root / "no-models")
         calls = [
             (lambda: models.audio_separate(self.root, "/reference.wav", "/stems"), "EDITTUDE_DEMUCS_REPO"),
             (lambda: models.singing_synthesize(self.root, "/score.json", "/song.wav"), "EDITTUDE_DIFFSINGER_DIR"),

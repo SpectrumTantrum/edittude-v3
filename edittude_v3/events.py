@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -66,7 +67,7 @@ async def iter_turn(
 ) -> AsyncIterator[tuple[str, Any]]:
     async for event in agent.astream_events(
         {"messages": [{"role": "user", "content": prompt}]},
-        config={"configurable": {"thread_id": thread_id}, "recursion_limit": 80},
+        config={"configurable": {"thread_id": thread_id}, "recursion_limit": int(os.environ.get("EDITTUDE_RECURSION_LIMIT", "400"))},
         version="v2",
     ):
         kind = event.get("event")

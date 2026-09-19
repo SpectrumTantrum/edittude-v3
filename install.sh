@@ -205,6 +205,9 @@ while [ $# -gt 0 ]; do
       log "Usage: install.sh [update] [--force] [--with-models[=LIST]]"
       log "  --with-models[=LIST]  also install the neural backends (default: asr,separation)"
       log "                        about 2.7 GB: torch runtime plus pinned weights"
+      log "                        LIST names: asr, separation, seed-vc, diffsinger"
+      log "                        seed-vc (GPL-3.0, ~2.5 GB) and diffsinger (non-commercial"
+      log "                        checkpoint, ~0.5 GB) are opt-in only"
       exit 0
       ;;
     *) die "Unknown argument: $1. Try: ./install.sh or ./install.sh update" ;;

@@ -20,7 +20,9 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.utils.function_calling import convert_to_openai_tool
 from pydantic import Field
 
-from edittude_v3.agent import MODEL, build_agent
+from deepagents.middleware.summarization import create_summarization_middleware
+
+from edittude_v3.agent import MODEL, build_agent, build_backend
 from edittude_v3.cli import _parser, main
 from edittude_v3.skills import list_skill_names, list_skills
 from edittude_v3.tools import list_tool_names, load_workspace_tools
@@ -29,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[1]
 MEDIA_TOOLS = {
     "get_capabilities", "media_inspect", "media_render", "audio_timing",
     "score_read", "speech_transcribe", "speech_synthesize", "audio_separate",
-    "singing_synthesize", "voice_convert",
+    "singing_synthesize", "voice_convert", "image_describe",
 }
 
 
@@ -187,6 +189,21 @@ class HarnessTest(unittest.TestCase):
             self.assertGreaterEqual(len(names), 33)
             self.assertEqual(set(list_tool_names(workspace)), MEDIA_TOOLS)
 
+    def test_offloaded_history_lands_in_the_project_state_dir(self):
+        """Regression: artifacts_root of "/" wrote to the read-only macOS root."""
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary).resolve()
+            backend = build_backend(workspace)
+            middleware = create_summarization_middleware(
+                init_chat_model(MODEL, api_key="dummy"), backend
+            )
+            path = middleware._get_history_path("session_test")
+            self.assertTrue(path.startswith(str(workspace / ".edittude-v3")), path)
+            # Real file tools still work on absolute host paths.
+            probe = workspace / "probe.txt"
+            self.assertIsNone(backend.write(str(probe), "hi").error)
+            self.assertEqual(probe.read_text(), "hi")
+
     def test_workspace_skills_override_bundled_names(self):
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary)
@@ -206,7 +223,7 @@ class HarnessTest(unittest.TestCase):
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}), contextlib.redirect_stdout(output):
             main(["tools", "-C", str(ROOT)])
         lines = output.getvalue().splitlines()
-        self.assertEqual(lines[0], "10 tools")
+        self.assertEqual(lines[0], "11 tools")
         self.assertEqual({line.strip() for line in lines[1:]}, MEDIA_TOOLS)
 
     def test_tool_errors_are_returned_to_the_agent(self):

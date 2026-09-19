@@ -25,6 +25,7 @@ Pass `--workspace PATH` when the process is running elsewhere. Media-tool paths 
 | `audio_timing` | Measure silence, RMS energy, and onset candidates. These are not guaranteed musical beats. |
 | `score_read` | Read MIDI tracks, notes, tempo changes and timing. The agent selects the melody track. |
 | `speech_transcribe` | Run cached faster-whisper and save source-linked timed JSON. |
+| `image_describe` | Ask a local OpenAI-compatible vision model (LM Studio, Ollama) about 1 to 8 images. Set `EDITTUDE_VISION_URL` and `EDITTUDE_VISION_MODEL`, or use `edittude-v3 config`. |
 | `speech_synthesize` | Render a local stock voice using macOS `say` or `espeak`; return decoded WAV and measured duration. |
 | `audio_separate` | Invoke Demucs with a supplied local checkpoint repository and return actual stems. |
 | `singing_synthesize` | Invoke a compatible local DiffSinger backend with validated Mandarin timed lyric/note units. |
@@ -66,8 +67,10 @@ Timeline settings are `width`, `height`, `fps`, `fit` of `pad` or `crop`, and `a
 - ASR needs `faster_whisper` in its interpreter and a cached model name. For a local weight directory, set `EDITTUDE_ASR_MODEL_DIR` and call with `model="local"`. It uses `local_files_only=True`. Word timestamps are recognition estimates, not forced alignment.
 - Stock speech needs an installed system voice. Requested reference-voice cloning returns `unavailable`; it never silently substitutes a stock voice.
 - Demucs needs its package plus `EDITTUDE_DEMUCS_REPO`, a local checkpoint directory.
-- DiffSinger needs `EDITTUDE_DIFFSINGER_DIR`, `EDITTUDE_DIFFSINGER_EXP`, compatible weights and the CLI contract checked in [models.py](models.py). The adapter supports Mandarin lyric/note units and explicit rests; unsupported inputs fail before inference.
+- DiffSinger needs `EDITTUDE_DIFFSINGER_DIR`, `EDITTUDE_DIFFSINGER_EXP` (default `0228_opencpop_ds100_rel`), compatible weights and the CLI contract checked in [models.py](models.py). The adapter supports Mandarin lyric/note units and explicit rests; unsupported inputs fail before inference.
 - Seed-VC needs `EDITTUDE_SEED_VC_DIR`, `EDITTUDE_SEED_VC_CHECKPOINT`, `EDITTUDE_SEED_VC_CONFIG`, and cached auxiliary weights.
+
+`edittude-media models install --models seed-vc,diffsinger` supplies all four variables' defaults. See the README for the GPL-3.0 and non-commercial-checkpoint terms those two carry.
 
 Neural model subprocesses run offline. Supply missing dependencies/weights explicitly, then inspect capabilities again. A configured backend is not an inference-quality guarantee.
 

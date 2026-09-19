@@ -10,8 +10,9 @@ from rich.panel import Panel
 from rich.text import Text
 
 from edittude_v3 import __version__
-from edittude_v3.agent import MODEL_LABEL, build_agent
+from edittude_v3.agent import build_agent, model_label
 from edittude_v3.events import iter_turn, preview
+from edittude_v3.paths import state_dir
 from edittude_v3.skills import list_skill_names
 from edittude_v3.tools import list_tool_names
 
@@ -37,9 +38,7 @@ THEME = xli.CODEX.with_overrides(
 
 
 def _history_file(workspace: Path) -> str:
-    path = workspace / ".edittude-v3" / "history"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    return str(path)
+    return str(state_dir(workspace) / "history")
 
 
 def _banner(workspace: Path, skills: int, tools: int) -> RenderableType:
@@ -49,7 +48,7 @@ def _banner(workspace: Path, skills: int, tools: int) -> RenderableType:
 
     body = Text(style="dim")
     rows = (
-        ("model", MODEL_LABEL),
+        ("model", model_label()),
         ("cwd", str(workspace).replace(str(Path.home()), "~", 1)),
         ("", f"{skills} skills · {tools} tools"),
     )
@@ -80,7 +79,7 @@ def run_tui(*, workspace: Path, thread: str | None = None) -> None:
         notify_after=20,
     )
     ui.status.set(
-        model=MODEL_LABEL,
+        model=model_label(),
         thread=thread_id[:8],
         skills=f"{len(skills)} skills",
     )
@@ -103,7 +102,7 @@ def run_tui(*, workspace: Path, thread: str | None = None) -> None:
     @ui.command("status", description="show model, thread, and workspace")
     async def cmd_status(ui: xli.UI, args: str) -> None:
         ui.note(
-            f"{MODEL_LABEL} · thread {thread_id[:8]} · {workspace} · {len(list_skill_names(workspace))} skills"
+            f"{model_label()} · thread {thread_id[:8]} · {workspace} · {len(list_skill_names(workspace))} skills"
         )
 
     @ui.on_prompt

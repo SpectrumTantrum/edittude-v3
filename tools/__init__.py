@@ -157,7 +157,18 @@ def get_tools(workspace: str | Path) -> list:
         return invoke(models.voice_convert, audio_path, reference_audio_path,
                       output_path, diffusion_steps)
 
+    def image_describe(image_paths: list[str], question: str) -> dict:
+        """LOOK at images. You cannot see images yourself; read_file on a jpg or png shows you nothing.
+
+        Sends 1 to 8 jpg/png/webp files to the local vision model and returns its answer
+        as text. Extract frames or a contact sheet first (edittude-v3 media thumbs, or
+        media_inspect mode 'frames'), then ask a concrete question: 'For each image:
+        location, subject, shot scale, camera motion, anything unusable.' The answer is
+        a model's reading, not ground truth; ask again when a cut depends on a detail.
+        """
+        return invoke(models.image_describe, image_paths, question)
+
     registered = [get_capabilities, media_inspect, media_render, audio_timing,
                   score_read, speech_transcribe, speech_synthesize, audio_separate,
-                  singing_synthesize, voice_convert]
+                  singing_synthesize, voice_convert, image_describe]
     return registered

@@ -7,7 +7,10 @@ virtualenv never gains torch.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
+import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,6 +26,11 @@ from tools.models import capabilities
 # Shared with every backend; the pins come from edittude-v2's asr extra. TorchAudio 2.9
 # removed APIs these backends still call.
 SHARED = ["torch>=2.6,<2.9", "torchaudio>=2.6,<2.9", "numpy<3", "soundfile", "huggingface-hub>=0.34,<1"]
+
+# edittude-v2 downloaded most of these weights already, pinned to the same revisions this table
+# uses, and records the revision it fetched in each directory's .edittude-model.json. An exact
+# revision match is therefore the whole reuse check: matching weights are linked, not re-fetched.
+V2_MODELS = Path(os.environ.get("EDITTUDE_V2_MODELS") or Path.home() / ".edittude/models")
 
 _DEMUCS = "https://dl.fbaipublicfiles.com/demucs/hybrid_transformer/"
 _REMOTE = "https://raw.githubusercontent.com/facebookresearch/demucs/e976d93ecc3865e5757426930257e200846a520a/demucs/remote/"
@@ -55,7 +63,10 @@ BACKENDS = {
     # (./checkpoints and ./checkpoints/hf_cache, relative to the clone), so no path patch is needed.
     "seed-vc": {
         "tool": "voice_convert", "size_gb": 2.5, "files": [],
-        "deps": ["einops>=0.8,<1", "munch>=4,<5", "librosa>=0.11,<0.12", "transformers>=4.45,<5"],
+        # descript-audio-codec is what the vendored dac/ package needs; argbind and
+        # descript-audiotools come with it.
+        "deps": ["einops>=0.8,<1", "munch>=4,<5", "librosa>=0.11,<0.12", "transformers>=4.45,<5",
+                 "descript-audio-codec>=1,<2", "scipy>=1.15,<2", "PyYAML>=6,<7"],
         "git": {"url": "https://github.com/Plachtaa/seed-vc", "into": "seed-vc",
                 "sha": "86959712a9d7971b691bc9919bed78306eca8f41"},
         "hf": [
@@ -76,11 +87,11 @@ BACKENDS = {
     # DiffSinger is MIT, but its opencpop checkpoint is not; see "notice".
     "diffsinger": {
         "tool": "singing_synthesize", "size_gb": 0.5, "files": [],
-        "deps": ["pytorch-lightning>=2.5,<3", "pypinyin>=0.53,<1", "jieba>=0.42,<1", "g2pM>=0.1.2.5,<1",
-                 "praat-parselmouth>=0.4.5,<1", "pycwt>=0.4.0b0,<0.5", "PyWavelets>=1.6,<2",
-                 "h5py>=3.12,<4", "textgrid>=1.6,<2", "webrtcvad-wheels>=2.0.14,<3",
-                 "scikit-image>=0.25,<1", "pandas>=2.2,<3", "tensorboardX>=2.6,<3",
-                 "matplotlib>=3.9,<4", "librosa>=0.11,<0.12", "scipy>=1.15,<2"],
+        # Trimmed to what the patched inference path actually imports: the patch keeps
+        # DIFF_DECODERS out of usr.diffsinger_task, so the training stack never loads.
+        "deps": ["pypinyin>=0.53,<1", "pycwt>=0.4.0b0,<0.5", "h5py>=3.12,<4", "pandas>=2.2,<3",
+                 "matplotlib>=3.9,<4", "librosa>=0.11,<0.12", "scipy>=1.15,<2", "einops>=0.8,<1",
+                 "PyYAML>=6,<7"],
         "git": {"url": "https://github.com/MoonInTheRiver/DiffSinger", "into": "DiffSinger",
                 "sha": "4662c53a27a5ac662821eae23a7d71cfcff7356d"},
         # Upstream resolves checkpoints/<exp>, vocoder_ckpt and pe_ckpt relative to its own
@@ -114,40 +125,127 @@ def _venv(deps: list[str]) -> None:
     _run([_uv(), "pip", "install", "--quiet", "--python", python, *deps])
 
 
+def _digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _adopt(source: Path, destination: Path) -> None:
+    """Take an already-downloaded file, without spending the bytes again."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.link(source, destination)
+    except OSError:  # A separate filesystem, so pay for the copy.
+        shutil.copy2(source, destination)
+
+
+def _wanted(names, patterns) -> list[str]:
+    """The subset of names an hf entry asked for; [] means the source is no use to us."""
+    names = [name for name in names
+             if not patterns or any(fnmatch.fnmatch(name, pattern) for pattern in patterns)]
+    # Every pattern has to land something, or we would install a partial model and call it done.
+    return names if all(any(fnmatch.fnmatch(name, pattern) for name in names)
+                        for pattern in patterns or []) else []
+
+
+def _installed_v2(entry: dict) -> tuple[Path, list[str]] | None:
+    """An edittude-v2 model directory at this exact revision that holds every file we want.
+
+    One revision can cover several directories (Plachta/Seed-VC ships both the f0 and the
+    non-f0 checkpoint), so matching the revision alone picks the wrong weights.
+    """
+    for manifest in sorted(V2_MODELS.glob("*/.edittude-model.json")):
+        record = json.loads(manifest.read_text(encoding="utf-8"))
+        if record.get("revision") != entry["rev"]:
+            continue
+        names = _wanted(record["files"], entry.get("files"))
+        if names:
+            return manifest.parent, names
+    return None
+
+
 def _download(destination: Path, url: str, digest: str) -> None:
-    if destination.is_file() and hashlib.sha256(destination.read_bytes()).hexdigest().startswith(digest):
+    if destination.is_file() and _digest(destination).startswith(digest):
         print(f"have   {destination.name}")
+        return
+    # Same file, same checksum, already paid for by edittude-v2.
+    adopted = next((path for path in sorted(V2_MODELS.glob(f"*/{destination.name}"))
+                    if _digest(path).startswith(digest)), None)
+    if adopted is not None:
+        print(f"link   {destination.name} from {adopted.parent.name}")
+        _adopt(adopted, destination)
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
     staged = destination.with_suffix(destination.suffix + ".part")
     print(f"fetch  {destination.name}")
     urllib.request.urlretrieve(url, staged)  # noqa: S310 - pinned https URLs above.
-    if not hashlib.sha256(staged.read_bytes()).hexdigest().startswith(digest):
+    if not _digest(staged).startswith(digest):
         staged.unlink()
         raise SystemExit(f"Checksum mismatch for {url}")
     staged.replace(destination)
 
 
-def _snapshot(repo_id: str, revision: str, destination: Path) -> None:
-    """Download pinned HF weights from inside the model venv, not the agent venv."""
-    print(f"fetch  {repo_id}@{revision[:8]}")
-    _run([model_python(), "-c", "import sys; from huggingface_hub import snapshot_download;"
-          " snapshot_download(sys.argv[1], revision=sys.argv[2], local_dir=sys.argv[3])",
-          repo_id, revision, destination])
+def _snapshot(entry: dict, destination: Path) -> None:
+    """Install one pinned HF repo, preferring bytes already on disk over the network."""
+    label = f"{entry['repo']}@{entry['rev'][:8]}"
+    slug = f"models--{entry['repo'].replace('/', '--')}"
+    # cache=True lays the repo out the way upstream's own hf_hub_download reads it back offline.
+    root = destination / slug / "snapshots" / entry["rev"] if entry.get("cache") else destination
+    adopted = _installed_v2(entry)
+    present = _wanted([str(path.relative_to(root)) for path in root.rglob("*") if path.is_file()],
+                      entry.get("files")) if root.is_dir() else []
+    if present:
+        print(f"have   {label}")
+    elif adopted is not None:
+        source, names = adopted
+        print(f"link   {label} from {source.name}")
+        for name in names:
+            _adopt(source / name, root / name)
+    else:
+        # Downloads run inside the model venv, not the agent venv, which never gains torch.
+        print(f"fetch  {label}")
+        _run([model_python(), "-c", "import json, sys; from huggingface_hub import snapshot_download;"
+              " snapshot_download(**json.loads(sys.argv[1]))",
+              json.dumps({"repo_id": entry["repo"], "revision": entry["rev"],
+                          "allow_patterns": entry.get("files") or None,
+                          ("cache_dir" if entry.get("cache") else "local_dir"): str(destination)})])
+    if entry.get("cache"):
+        # Downloading by sha leaves no refs/main, and the upstream code we call resolves these
+        # repos by their default revision. Point main at the revision we pinned.
+        reference = destination / slug / "refs" / "main"
+        reference.parent.mkdir(parents=True, exist_ok=True)
+        reference.write_text(entry["rev"], encoding="utf-8")
+
+
+def _clone(spec: dict, destination: Path) -> None:
+    """Clone an upstream at its pinned sha and apply our patch, idempotently."""
+    if not (destination / ".git").is_dir():
+        print(f"clone  {spec['url']}")
+        _run(["git", "clone", "--quiet", spec["url"], destination])
+    git = ["git", "-C", str(destination)]
+    if subprocess.run([*git, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() != spec["sha"]:
+        _run([*git, "checkout", "--force", "--quiet", spec["sha"]])
+    patch = Path(__file__).resolve().parent / "patches" / f"{spec['into']}.patch"
+    if subprocess.run([*git, "apply", "--reverse", "--check", str(patch)], capture_output=True).returncode:
+        print(f"patch  {patch.name}")
+        _run([*git, "apply", str(patch)])
 
 
 def install(names: list[str]) -> None:
     total = sum(BACKENDS[name]["size_gb"] for name in names)
     print(f"Installing {', '.join(names)}: about {total:.2f} GB of weights "
           f"plus about 2.5 GB of torch runtime into {install_root()}")
+    for name in names:
+        if BACKENDS[name].get("notice"):
+            print(f"note:  {BACKENDS[name]['notice']}")
     _venv(SHARED + [dep for name in names for dep in BACKENDS[name]["deps"]])
     for name in names:
         backend = BACKENDS[name]
+        if backend.get("git"):
+            _clone(backend["git"], models_root() / backend["git"]["into"])
         for relative, url, digest in backend["files"]:
             _download(models_root() / relative, url, digest)
-        if backend["hf"]:
-            repo_id, revision, relative = backend["hf"]
-            _snapshot(repo_id, revision, models_root() / relative)
+        for entry in backend["hf"]:
+            _snapshot(entry, models_root() / entry["into"])
 
 
 def check(names: list[str]) -> int:

@@ -1,6 +1,7 @@
 """Optional local model adapters. No model downloads or implicit voice substitution."""
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import math
@@ -11,20 +12,25 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.error
+import urllib.request
 
 from .common import (CapabilityUnavailable, artifact_path, input_path, model_python, models_root,
                      output_path as resolve_output, probe, publish, run)
 
-INSTALL_HINT = "run: edittude-media models install"
+INSTALL_HINT = "run: edittude-media models install (seed-vc and diffsinger need --models seed-vc,diffsinger)"
 # Weights installed by tools/install_models.py, relative to models_root().
 DEFAULTS = {
     "EDITTUDE_ASR_MODEL_DIR": "asr/faster-whisper-base",
     "EDITTUDE_DEMUCS_REPO": "demucs",
     "EDITTUDE_SEED_VC_DIR": "seed-vc",
-    "EDITTUDE_SEED_VC_CHECKPOINT": "seed-vc/ckpt/model.pth",
-    "EDITTUDE_SEED_VC_CONFIG": "seed-vc/ckpt/config.yml",
+    # The installer drops Plachta/Seed-VC's pinned f0 44k pair here under its published names.
+    "EDITTUDE_SEED_VC_CHECKPOINT":
+        "seed-vc/ckpt/DiT_seed_v2_uvit_whisper_base_f0_44k_bigvgan_pruned_ft_ema_v2.pth",
+    "EDITTUDE_SEED_VC_CONFIG": "seed-vc/ckpt/config_dit_mel_seed_uvit_whisper_base_f0_44k.yml",
     "EDITTUDE_DIFFSINGER_DIR": "DiffSinger",
 }
+DIFFSINGER_EXP = "0228_opencpop_ds100_rel"  # The checkpoint the installer fetches.
 
 
 _OFFLINE_ENV = {
@@ -303,7 +309,7 @@ def singing_synthesize(workspace: Path, analysis_path: str, output_path: str) ->
     analysis = json.loads(source.read_text(encoding="utf-8"))
     payload = _singing_input(analysis)
     backend = _configured_path("EDITTUDE_DIFFSINGER_DIR")
-    experiment = os.environ.get("EDITTUDE_DIFFSINGER_EXP", "")
+    experiment = os.environ.get("EDITTUDE_DIFFSINGER_EXP") or DIFFSINGER_EXP
     if not re.fullmatch(r"[A-Za-z0-9_.-]+", experiment):
         raise CapabilityUnavailable("Set EDITTUDE_DIFFSINGER_EXP to the installed checkpoint experiment name")
     entry = backend / "inference/svs/ds_e2e.py"
@@ -367,6 +373,46 @@ runpy.run_path(str(entry), run_name='__main__')
                          "diffusion_steps": diffusion_steps}, "pitch_and_identity_review": "unverified"}
 
 
+VISION_URL = "http://localhost:1234/v1"  # LM Studio. Ollama: http://localhost:11434/v1
+VISION_MODEL = "qwen/qwen3.8-27b"
+
+
+def _vision() -> tuple[str, str]:
+    return ((os.environ.get("EDITTUDE_VISION_URL") or VISION_URL).rstrip("/"),
+            os.environ.get("EDITTUDE_VISION_MODEL") or VISION_MODEL)
+
+
+def image_describe(workspace: Path, image_paths: list[str], question: str) -> dict:
+    """Ask a local OpenAI-compatible vision model about up to 8 images."""
+    if not image_paths or len(image_paths) > 8:
+        raise ValueError("Supply 1 to 8 image paths")
+    url, model = _vision()
+    content: list[dict] = [{"type": "text", "text": question}]
+    for value in image_paths:
+        path = input_path(workspace, value)
+        kind = {".jpg": "jpeg", ".jpeg": "jpeg", ".png": "png", ".webp": "webp"}.get(path.suffix.lower())
+        if kind is None:
+            raise ValueError(f"Not a jpg, png or webp image: {value}")
+        data = base64.b64encode(path.read_bytes()).decode("ascii")
+        content.append({"type": "image_url", "image_url": {"url": f"data:image/{kind};base64,{data}"}})
+    body = json.dumps({"model": model, "temperature": 0.2,
+                       "messages": [{"role": "user", "content": content}]}).encode("utf-8")
+    request = urllib.request.Request(  # noqa: S310 - user-configured local endpoint.
+        f"{url}/chat/completions", data=body, headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {os.environ.get('EDITTUDE_VISION_API_KEY') or 'local'}"})
+    try:
+        with urllib.request.urlopen(request, timeout=300) as response:  # noqa: S310
+            reply = json.load(response)
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f"{model} at {url}: {error.read().decode('utf-8', 'replace')[-500:]}") from error
+    except OSError as error:
+        raise CapabilityUnavailable(
+            f"No vision model at {url} ({error}). Start it, or run: edittude-v3 config set vision-url URL") from error
+    return {"model": model, "images": len(image_paths),
+            "description": reply["choices"][0]["message"]["content"].strip()}
+
+
 def capabilities() -> dict:
     """Discover executables/configuration without importing models or downloading weights."""
     result = {}
@@ -395,8 +441,10 @@ def capabilities() -> dict:
                 _configured_path("EDITTUDE_DEMUCS_REPO")
             elif backend == "DIFFSINGER":
                 directory = _configured_path("EDITTUDE_DIFFSINGER_DIR")
-                if not (directory / "inference/svs/ds_e2e.py").is_file() or not os.environ.get("EDITTUDE_DIFFSINGER_EXP"):
-                    raise CapabilityUnavailable("Configure a compatible DiffSinger CLI and EDITTUDE_DIFFSINGER_EXP")
+                if not (directory / "inference/svs/ds_e2e.py").is_file():
+                    raise CapabilityUnavailable("Configure a compatible DiffSinger CLI")
+                if not (directory / "checkpoints" / (os.environ.get("EDITTUDE_DIFFSINGER_EXP") or DIFFSINGER_EXP)).is_dir():
+                    raise CapabilityUnavailable(f"No DiffSinger checkpoint experiment installed; {INSTALL_HINT}, or set EDITTUDE_DIFFSINGER_EXP")
             elif backend == "SEED_VC":
                 directory = _configured_path("EDITTUDE_SEED_VC_DIR")
                 if not (directory / "inference.py").is_file():
@@ -408,6 +456,15 @@ def capabilities() -> dict:
         result[tool] = {"status": "unavailable" if reason else "configured", "runtime": runtime,
                         "reason": reason or "Package/configuration found; required cached model assets are checked at invocation",
                         "model_weights": "unverified", "downloads": False}
+    url, model = _vision()
+    try:
+        with urllib.request.urlopen(f"{url}/models", timeout=2) as response:  # noqa: S310
+            served = [item["id"] for item in json.load(response)["data"]]
+        reason = None if model in served else f"{model} is not served at {url}; it serves {served}"
+    except (OSError, ValueError, KeyError) as error:
+        reason = f"No vision model at {url} ({error})"
+    result["image_describe"] = {"status": "unavailable" if reason else "configured", "url": url,
+                                "model": model, "reason": reason or "Endpoint serves the model"}
     engine = shutil.which("say") or shutil.which("espeak-ng") or shutil.which("espeak")
     result["speech_synthesize"] = {"status": "configured" if engine else "unavailable", "backend": engine,
                                     "reference_voice": False, "reason": "Stock executable found; voice/service availability is verified on render" if engine else "No say/espeak executable found"}

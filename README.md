@@ -55,15 +55,30 @@ Write large renders next to the footage, not into this repo.
 
 ## Neural models (opt-in)
 
-Transcription and stem separation need extra runtimes and weights. Nothing is downloaded unless you ask:
+Transcription, stem separation, voice conversion and singing synthesis need extra runtimes and weights. Nothing is downloaded unless you ask:
 
 ```bash
-./install.sh --with-models              # or --with-models=asr,separation
-edittude-media models install           # same thing, after the fact
-edittude-media models install --check   # status only, no network
+./install.sh --with-models                          # or --with-models=asr,separation
+edittude-media models install                       # same thing, after the fact
+edittude-media models install --models seed-vc,diffsinger
+edittude-media models install --check               # status only, no network
 ```
 
-That creates a separate `.venv-models` (Python 3.11, torch) beside the install and puts weights in `models/`; the agent's own virtualenv is untouched. Budget about 2.5 GB for the torch runtime plus `asr` roughly 0.15 GB and `separation` roughly 0.1-0.35 GB of weights. Override locations with `EDITTUDE_MODELS_DIR`, `EDITTUDE_MODEL_PYTHON`, or the per-backend `EDITTUDE_*` variables.
+That creates a separate `.venv-models` (Python 3.11, torch) beside the install and puts weights in `models/`; the agent's own virtualenv is untouched. Budget about 2.5 GB for the torch runtime plus the weights for whichever backends you pick. Override locations with `EDITTUDE_MODELS_DIR`, `EDITTUDE_MODEL_PYTHON`, or the per-backend `EDITTUDE_*` variables.
+
+| backend | tool | weights | notes |
+| --- | --- | --- | --- |
+| `asr` | `speech_transcribe` | ~0.15 GB | default |
+| `separation` | `audio_separate` | ~0.1-0.35 GB | default |
+| `seed-vc` | `voice_convert` | ~2.5 GB | explicit opt-in |
+| `diffsinger` | `singing_synthesize` | ~0.5 GB | explicit opt-in, Mandarin only |
+
+`seed-vc` and `diffsinger` stay out of the default list because they are large and their licences are not this repo's:
+
+- **Seed-VC is GPL-3.0.** The installer clones it from upstream at a pinned commit into `models/seed-vc` and applies `tools/patches/seed-vc.patch`; nothing of it is vendored into this MIT repo. Your use of `voice_convert` is subject to the GPL.
+- **DiffSinger is MIT, but its `0228_opencpop_ds100_rel` checkpoint is trained on Opencpop (CC BY-NC-ND 4.0) and is therefore non-commercial only.** The installer prints this when you install `diffsinger`. `singing_synthesize` sings Mandarin and nothing else.
+
+Both are fetched at install time and never committed. Everything runs offline afterwards.
 
 ## Keys
 
