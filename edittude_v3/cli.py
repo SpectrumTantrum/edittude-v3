@@ -35,7 +35,7 @@ from edittude_v3.events import iter_turn, preview
 from edittude_v3.paths import env_file, install_root
 from edittude_v3.skills import list_skills
 from edittude_v3.tools import list_tool_names
-from edittude_v3.tui import ACCENT, run_tui
+from edittude_v3.tui import ACCENT, BLUE, GREY, ORANGE, RED, TEAL, run_tui
 
 console = Console()
 
@@ -111,7 +111,7 @@ def ensure_api_key() -> None:
     if not sys.stdin.isatty():
         require_api_key()
     console.print()
-    console.print(f"[bold {ACCENT}]edittude-v3[/] needs a DeepSeek API key.")
+    console.print(f"[{ACCENT}]◆[/] [bold]edittude-v3[/] needs a DeepSeek API key.")
     console.print(f"[dim]Get one at {API_KEY_URL}[/]")
     console.print()
     while True:
@@ -138,10 +138,12 @@ async def _ask_async(prompt: str, workspace: Path, thread: str) -> None:
     agent = build_agent(workspace=workspace)
     parts: list[str] = []
     home = escape(_home(workspace))
-    console.print(f"[bold {ACCENT}]edittude-v3[/][dim] · {model_label()} · {home}[/]")
+    console.print(
+        f"[bold]edittude-v3[/][dim] │ [/][{TEAL}]{model_label()}[/][dim] │ [/][{ORANGE}]{home}[/]"
+    )
     console.print()
 
-    with Status("thinking", console=console, spinner="dots", spinner_style=ACCENT):
+    with Status("Thinking…", console=console, spinner="dots", spinner_style=ACCENT):
         async for kind, payload in iter_turn(agent, prompt, thread):
             if kind == "text":
                 parts.append(payload)
@@ -149,10 +151,12 @@ async def _ask_async(prompt: str, workspace: Path, thread: str) -> None:
                 name = escape(payload["name"])
                 args = payload.get("args") or {}
                 hint = args.get("file_path") or args.get("query") or args.get("command") or ""
-                console.print(f"  [{ACCENT}]⏺[/] [bold]{name}[/] [dim]{escape(str(hint))}[/]")
+                console.print(
+                    f"  [{GREY}]◆[/] [bold]{name}[/] [dim]{escape(str(hint))}[/]", highlight=False
+                )
             elif kind == "tool_end":
                 out = escape(preview(payload.get("output"), limit=80))
-                console.print(f"  [dim]⎿ {out}[/]")
+                console.print(f"  [{GREY}]┃[/] [dim]{out}[/]", highlight=False)
 
     text = "".join(parts).strip()
     if text:
@@ -174,7 +178,7 @@ def cmd_skills(*, workspace: Path) -> None:
         return
     console.print(f"[bold]{len(rows)} skill{'' if len(rows) == 1 else 's'}[/]")
     table = Table(box=None, show_header=False, padding=(0, 2, 0, 2))
-    table.add_column(style=f"bold {ACCENT}")
+    table.add_column(style=f"bold {BLUE}")
     table.add_column(style="dim")
     for name, description in rows:
         table.add_row(escape(name), escape(description or ""))
@@ -188,7 +192,7 @@ def cmd_tools(*, workspace: Path) -> None:
         return
     console.print(f"[bold]{len(names)} tool{'' if len(names) == 1 else 's'}[/]")
     table = Table(box=None, show_header=False, padding=(0, 2, 0, 2))
-    table.add_column(style=f"bold {ACCENT}")
+    table.add_column(style="bold")
     for name in names:
         table.add_row(escape(name))
     console.print(table)
@@ -218,7 +222,7 @@ def cmd_update(*, force: bool = False) -> None:
     installer = root / "install.sh"
     if not installer.is_file():
         console.print(
-            f"[bold red]error[/] no installer at {escape(str(installer))}. "
+            f"[bold {RED}]error[/] no installer at {escape(str(installer))}. "
             "This copy cannot update itself."
         )
         raise SystemExit(1)

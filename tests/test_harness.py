@@ -26,6 +26,7 @@ from edittude_v3.agent import MODEL, build_agent, build_backend
 from edittude_v3.cli import _parser, main
 from edittude_v3.skills import list_skill_names, list_skills
 from edittude_v3.tools import list_tool_names, load_workspace_tools
+from edittude_v3.tui import fmt_duration
 
 ROOT = Path(__file__).resolve().parents[1]
 MEDIA_TOOLS = {
@@ -225,6 +226,12 @@ class HarnessTest(unittest.TestCase):
         lines = output.getvalue().splitlines()
         self.assertEqual(lines[0], "11 tools")
         self.assertEqual({line.strip() for line in lines[1:]}, MEDIA_TOOLS)
+
+    def test_durations_read_like_grok(self):
+        for seconds, expected in (
+            (7.13, "7.1s"), (21.4, "21s"), (59.9, "59s"), (65, "1m5s"), (3720, "1h2m")
+        ):
+            self.assertEqual(fmt_duration(seconds), expected)
 
     def test_tool_errors_are_returned_to_the_agent(self):
         with tempfile.TemporaryDirectory() as temporary:
