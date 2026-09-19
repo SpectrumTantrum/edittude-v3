@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from edittude_v3.media.core import ASPECTS, LOOKS, read_json, write_json
+from edittude_v3.media.core import ASPECTS, LOOKS, MediaError, read_json, write_json
 
 HANDLE_IN = 0.12
 HANDLE_OUT = 0.08
@@ -88,8 +88,24 @@ def load_edl(path: Path) -> EditDecision:
 
 
 def edl_from_dict(data: dict[str, Any]) -> EditDecision:
+    if not isinstance(data, dict):
+        raise MediaError("EDL must be an object")
+    items = data.get("events", [])
+    if not isinstance(items, list):
+        raise MediaError("EDL events must be a list")
+    events = []
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise MediaError(f"EDL event {index}: must be an object")
+        for name in ("src", "in", "out"):
+            if name not in item and (name == "src" or f"{name}_point" not in item):
+                raise MediaError(f"EDL event {index}: missing {name}")
+        event = Event.from_dict(item)
+        if event.in_point >= event.out_point:
+            raise MediaError(f"EDL event {index}: in must be less than out")
+        events.append(event)
     return EditDecision(
-        events=[Event.from_dict(item) for item in data.get("events") or []],
+        events=events,
         title=str(data.get("title") or ""),
         subtitle=str(data.get("subtitle") or ""),
         aspect=str(data.get("aspect") or "16:9"),

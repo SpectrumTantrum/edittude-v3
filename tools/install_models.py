@@ -178,11 +178,14 @@ def _download(destination: Path, url: str, digest: str) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     staged = destination.with_suffix(destination.suffix + ".part")
     print(f"fetch  {destination.name}")
-    urllib.request.urlretrieve(url, staged)  # noqa: S310 - pinned https URLs above.
-    if not _digest(staged).startswith(digest):
-        staged.unlink()
-        raise SystemExit(f"Checksum mismatch for {url}")
-    staged.replace(destination)
+    try:
+        with urllib.request.urlopen(url, timeout=60) as response, staged.open("wb") as output:  # noqa: S310 - pinned https URLs above.
+            shutil.copyfileobj(response, output)
+        if not _digest(staged).startswith(digest):
+            raise SystemExit(f"Checksum mismatch for {url}")
+        staged.replace(destination)
+    finally:
+        staged.unlink(missing_ok=True)
 
 
 def _snapshot(entry: dict, destination: Path) -> None:

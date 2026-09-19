@@ -127,10 +127,11 @@ def get_tools(workspace: str | Path) -> list:
         return result
 
     def audio_separate(audio_path: str, output_dir: str, model: str = "htdemucs",
-                       stem: str = "vocals") -> dict:
+                       stem: str | None = "vocals") -> dict:
         """Separate supported stems using Demucs and an explicit LOCAL checkpoint repo.
 
         Requires EDITTUDE_DEMUCS_REPO and an installed Demucs runtime; no downloads.
+        Set stem to null for all stems.
         Returns actual stem paths and measurements. A decoded stem still needs
         listening review for old words, leakage, and processing artifacts.
         """

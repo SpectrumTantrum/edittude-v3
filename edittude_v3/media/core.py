@@ -85,7 +85,12 @@ def write_json(path: Path, data: Any) -> Path:
 
 
 def read_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise MediaError(f"{path}: not valid JSON: {exc}") from exc
+    except OSError as exc:
+        raise MediaError(f"{path}: {exc.strerror}") from exc
 
 
 def find_font() -> Path:
@@ -124,7 +129,7 @@ def run(
     except subprocess.TimeoutExpired as exc:
         raise MediaError(f"command timed out after {timeout}s: {printable}") from exc
     if check and result.returncode != 0:
-        err = (result.stderr or result.stdout or "").strip()
+        err = (result.stderr or result.stdout or "").strip() or "(see ffmpeg output above)"
         raise MediaError(f"command failed ({result.returncode}): {printable}\n{err}")
     return result
 

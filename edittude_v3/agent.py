@@ -31,7 +31,7 @@ SETTINGS = {
     "vision-api-key": ("EDITTUDE_VISION_API_KEY", ""),
     "recursion-limit": ("EDITTUDE_RECURSION_LIMIT", str(DEFAULT_RECURSION_LIMIT)),
 }
-_API_KEY_LINE = re.compile(rf"^(?:export\s+)?{API_KEY_ENV}=.*$", re.MULTILINE)
+_API_KEY_LINE = re.compile(rf"^(?:export\s+)?{API_KEY_ENV}=.*$\n?", re.MULTILINE)
 
 SYSTEM_PROMPT = """You are edittude-v3, a local cutter.
 
@@ -173,8 +173,8 @@ def save_api_key(key: str, path: Path | None = None) -> Path:
     line = f"{API_KEY_ENV}={key}"
     if path.is_file():
         text = path.read_text(encoding="utf-8")
-        if _API_KEY_LINE.search(text):
-            text = _API_KEY_LINE.sub(lambda _: line, text, count=1)
+        if match := _API_KEY_LINE.search(text):
+            text = text[:match.start()] + line + "\n" + _API_KEY_LINE.sub("", text[match.end():])
         else:
             text = text.rstrip("\n")
             text = f"{text}\n{line}" if text else line

@@ -33,7 +33,7 @@ def assemble(edl: EditDecision, out: Path, work_dir: Path) -> Path:
         _encode_event(event, dest, edl.width, edl.height, fps=int(edl.fps or 30))
         segments.append(dest)
     listing = work_dir / "concat.txt"
-    lines = [f"file '{seg.resolve()}'" for seg in segments]
+    lines = ["file '" + str(seg.resolve()).replace("'", "'\\''") + "'" for seg in segments]
     listing.write_text("\n".join(lines) + "\n", encoding="utf-8")
     out.parent.mkdir(parents=True, exist_ok=True)
     ffmpeg(
