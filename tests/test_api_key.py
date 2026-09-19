@@ -89,11 +89,11 @@ class EnsureApiKeyTest(unittest.TestCase):
                     ensure_api_key()
             save.assert_called_once_with("sk-from-prompt")
 
-    def test_first_launch_writes_install_env(self):
+    def test_first_launch_writes_config_home_env(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            (root / ".env").write_text("DEEPSEEK_API_KEY=\n", encoding="utf-8")
-            with patch.dict(os.environ, {API_KEY_ENV: "", "EDITTUDE_ROOT": str(root)}):
+            home = Path(temporary)
+            (home / ".env").write_text("DEEPSEEK_API_KEY=\n", encoding="utf-8")
+            with patch.dict(os.environ, {API_KEY_ENV: "", "EDITTUDE_CONFIG_HOME": str(home)}):
                 with (
                     patch("edittude_v3.cli.sys.stdin.isatty", return_value=True),
                     patch("edittude_v3.cli.getpass.getpass", return_value="sk-written"),
@@ -101,11 +101,51 @@ class EnsureApiKeyTest(unittest.TestCase):
                 ):
                     ensure_api_key()
                     self.assertEqual(os.environ[API_KEY_ENV], "sk-written")
-            self.assertEqual((root / ".env").read_text(encoding="utf-8"), "DEEPSEEK_API_KEY=sk-written\n")
+            self.assertEqual((home / ".env").read_text(encoding="utf-8"), "DEEPSEEK_API_KEY=sk-written\n")
 
     def test_configured_api_key_treats_whitespace_as_missing(self):
         with patch.dict(os.environ, {API_KEY_ENV: "   "}):
             self.assertEqual(configured_api_key(), "")
+
+
+class ConfigHomeTest(unittest.TestCase):
+    def test_env_file_uses_config_home_not_install_root_or_cwd(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            home = temporary / "home"
+            root = temporary / "root"
+            with patch.dict(os.environ, {"EDITTUDE_CONFIG_HOME": str(home), "EDITTUDE_ROOT": str(root)}):
+                self.assertEqual(env_file(), (home / ".env").resolve())
+
+    def test_load_env_reads_config_home_not_workspace(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            home = temporary / "home"
+            root = temporary / "root"
+            work = temporary / "work"
+            for path in (home, root, work):
+                path.mkdir()
+            (home / ".env").write_text(f"{API_KEY_ENV}=sk-home\n", encoding="utf-8")
+            (root / ".env").write_text(f"{API_KEY_ENV}=sk-root\n", encoding="utf-8")
+            (work / ".env").write_text(f"{API_KEY_ENV}=sk-work\n", encoding="utf-8")
+            with patch.dict(os.environ, {"EDITTUDE_CONFIG_HOME": str(home), "EDITTUDE_ROOT": str(root)}):
+                os.environ.pop(API_KEY_ENV, None)
+                load_env()
+                self.assertEqual(os.environ.get(API_KEY_ENV), "sk-home")
+
+    def test_load_env_adopts_legacy_install_key(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            temporary = Path(temporary)
+            home = temporary / "home"
+            root = temporary / "root"
+            home.mkdir()
+            root.mkdir()
+            (root / ".env").write_text(f"{API_KEY_ENV}=sk-legacy\n", encoding="utf-8")
+            with patch.dict(os.environ, {"EDITTUDE_CONFIG_HOME": str(home), "EDITTUDE_ROOT": str(root)}):
+                os.environ.pop(API_KEY_ENV, None)
+                load_env()
+                self.assertEqual(os.environ.get(API_KEY_ENV), "sk-legacy")
+                self.assertEqual((home / ".env").read_text(encoding="utf-8"), f"{API_KEY_ENV}=sk-legacy\n")
 
 
 if __name__ == "__main__":

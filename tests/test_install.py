@@ -65,7 +65,10 @@ class InstallScriptTest(unittest.TestCase):
             bindir = Path(temporary) / "bin"
             env = os.environ.copy()
             env["EDITTUDE_BIN"] = str(bindir)
+            config_home = Path(temporary) / "home"
+            env["EDITTUDE_CONFIG_HOME"] = str(config_home)
             subprocess.check_call(["bash", str(ROOT / "install.sh")], env=env)
+            self.assertIn("DEEPSEEK_API_KEY", (config_home / ".env").read_text(encoding="utf-8"))
             launcher = bindir / "edittude-v3"
             self.assertTrue(os.access(launcher, os.X_OK))
             text = launcher.read_text(encoding="utf-8")
@@ -93,6 +96,7 @@ class InstallScriptTest(unittest.TestCase):
 
             env = _git_env()
             env["EDITTUDE_BIN"] = str(bindir)
+            env["EDITTUDE_CONFIG_HOME"] = str(temporary / "config")
             env["EDITTUDE_SKIP_SYNC"] = "1"
             subprocess.check_call(["bash", str(home / "install.sh"), "update"], env=env)
 
@@ -117,6 +121,7 @@ class InstallScriptTest(unittest.TestCase):
 
             env = _git_env()
             env["EDITTUDE_BIN"] = str(temporary / "bin")
+            env["EDITTUDE_CONFIG_HOME"] = str(temporary / "config")
             env["EDITTUDE_SKIP_SYNC"] = "1"
             failed = subprocess.run(
                 ["bash", str(home / "install.sh"), "update"],

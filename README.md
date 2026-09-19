@@ -14,7 +14,7 @@ That installs `uv` if needed, syncs the project, and puts `edittude-v3` in `~/.l
 
 ffmpeg and ffprobe must be on PATH. On a Mac: `brew install ffmpeg`.
 
-First launch asks for a DeepSeek API key and writes it to `~/.local/share/edittude-v3/.env`. Get a key from https://platform.deepseek.com. That file is the only place the app looks, besides `DEEPSEEK_API_KEY` already in the environment.
+First launch asks for a DeepSeek API key and writes it to `~/.config/edittude-v3/.env`. Get a key from https://platform.deepseek.com. That file is the only place the app looks, besides `DEEPSEEK_API_KEY` already in the environment.
 
 ## CLI
 

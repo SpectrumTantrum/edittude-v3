@@ -10,11 +10,12 @@
 #   ./install.sh --with-models[=asr,separation]
 #
 # Optional environment:
-#   EDITTUDE_REPO     git URL to clone when this script is not next to pyproject.toml
-#   EDITTUDE_REF      branch or tag (default: main)
-#   EDITTUDE_HOME     clone destination (default: ~/.local/share/edittude-v3)
-#   EDITTUDE_BIN      launcher directory (default: ~/.local/bin)
-#   EDITTUDE_PYTHON   Python version for uv (default: 3.13)
+#   EDITTUDE_REPO         git URL to clone when this script is not next to pyproject.toml
+#   EDITTUDE_REF          branch or tag (default: main)
+#   EDITTUDE_HOME         clone destination (default: ~/.local/share/edittude-v3)
+#   EDITTUDE_CONFIG_HOME  API key / config directory (default: ~/.config/edittude-v3)
+#   EDITTUDE_BIN          launcher directory (default: ~/.local/bin)
+#   EDITTUDE_PYTHON       Python version for uv (default: 3.13)
 
 set -euo pipefail
 
@@ -230,7 +231,7 @@ if [ -n "$WITH_MODELS" ]; then
     edittude-media models install --models "$WITH_MODELS"
 fi
 
-CONFIG_HOME="${EDITTUDE_HOME:-${HOME}/.local/share/edittude-v3}"
+CONFIG_HOME="${EDITTUDE_CONFIG_HOME:-${HOME}/.config/edittude-v3}"
 if [ ! -f "${CONFIG_HOME}/.env" ]; then
   mkdir -p "${CONFIG_HOME}"
   if [ -f "${PREFIX}/.env.example" ]; then
@@ -238,6 +239,7 @@ if [ ! -f "${CONFIG_HOME}/.env" ]; then
   else
     printf 'DEEPSEEK_API_KEY=\n' > "${CONFIG_HOME}/.env"
   fi
+  chmod 600 "${CONFIG_HOME}/.env"
   info "Wrote ${CONFIG_HOME}/.env"
 fi
 

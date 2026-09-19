@@ -15,11 +15,11 @@ def install_root() -> Path:
 
 
 def config_home() -> Path:
-    """User data directory. The API key lives here, not in the project folder."""
-    override = os.environ.get("EDITTUDE_HOME")
+    """User config directory. The API key lives here, not in the project folder."""
+    override = os.environ.get("EDITTUDE_CONFIG_HOME")
     if override:
         return Path(override).expanduser().resolve()
-    return Path.home() / ".local/share" / "edittude-v3"
+    return Path.home() / ".config" / "edittude-v3"
 
 
 def env_file() -> Path:
