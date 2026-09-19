@@ -43,7 +43,8 @@ BACKENDS = {
     "asr": {
         "tool": "speech_transcribe", "deps": ["faster-whisper>=1.2,<2"], "size_gb": 0.15,
         "hf": [{"repo": "Systran/faster-whisper-base", "into": "asr/faster-whisper-base",
-                "rev": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66"}],
+                "rev": "ebe41f70d5b6dfa9166e2c581c45c9c0cfc57b66",
+                "files": ["model.bin", "config.json", "tokenizer.json", "vocabulary.txt"]}],
         "files": [],
     },
     "separation": {

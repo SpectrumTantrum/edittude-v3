@@ -22,13 +22,14 @@ MODEL = "deepseek:deepseek-flash"
 MODEL_LABEL = "DeepSeek Flash"
 API_KEY_ENV = "DEEPSEEK_API_KEY"
 API_KEY_URL = "https://platform.deepseek.com"
+DEFAULT_RECURSION_LIMIT = 400
 # `edittude-v3 config` names -> variables in env_file(). Defaults shown are what runs when unset.
 SETTINGS = {
     "model": ("EDITTUDE_MODEL", MODEL),
     "vision-url": ("EDITTUDE_VISION_URL", "http://localhost:1234/v1"),
     "vision-model": ("EDITTUDE_VISION_MODEL", "qwen/qwen3.8-27b"),
     "vision-api-key": ("EDITTUDE_VISION_API_KEY", ""),
-    "recursion-limit": ("EDITTUDE_RECURSION_LIMIT", "400"),
+    "recursion-limit": ("EDITTUDE_RECURSION_LIMIT", str(DEFAULT_RECURSION_LIMIT)),
 }
 _API_KEY_LINE = re.compile(rf"^(?:export\s+)?{API_KEY_ENV}=.*$", re.MULTILINE)
 
@@ -94,6 +95,12 @@ def get_settings() -> dict[str, str]:
 def set_setting(name: str, value: str | None) -> None:
     """Persist to env_file(); value None restores the default."""
     var = SETTINGS[name][0]
+    if name == "recursion-limit" and value is not None:
+        try:
+            if int(value) <= 0:
+                raise ValueError
+        except ValueError:
+            raise ValueError("recursion-limit must be a positive integer") from None
     path = env_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.touch(mode=0o600)

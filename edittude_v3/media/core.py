@@ -109,15 +109,20 @@ def run(
     *,
     check: bool = True,
     capture: bool = False,
+    timeout: float | None = 3600,
 ) -> subprocess.CompletedProcess[str]:
     printable = " ".join(cmd)
     print(f"+ {printable}", file=sys.stderr)
-    result = subprocess.run(
-        cmd,
-        check=False,
-        text=True,
-        capture_output=capture,
-    )
+    try:
+        result = subprocess.run(
+            cmd,
+            check=False,
+            text=True,
+            capture_output=capture,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise MediaError(f"command timed out after {timeout}s: {printable}") from exc
     if check and result.returncode != 0:
         err = (result.stderr or result.stdout or "").strip()
         raise MediaError(f"command failed ({result.returncode}): {printable}\n{err}")

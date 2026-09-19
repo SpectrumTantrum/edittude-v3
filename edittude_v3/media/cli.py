@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
 from edittude_v3.media.core import LOOKS, MediaError, write_json
@@ -22,6 +23,10 @@ from edittude_v3.media.render import (
 
 def main(argv: list[str] | None = None) -> None:
     parser = _parser()
+    argv = sys.argv[1:] if argv is None else list(argv)
+    # --force is a global flag; hoist it so it also works after the subcommand.
+    if "--force" in argv:
+        argv = ["--force", *(arg for arg in argv if arg != "--force")]
     args = parser.parse_args(argv)
     try:
         args.func(args)
@@ -34,6 +39,7 @@ def _parser() -> argparse.ArgumentParser:
         prog="edittude-media",
         description="Local ffmpeg tools for inventory, cut, mix, grade, titles, QC.",
     )
+    parser.add_argument("--force", action="store_true", help="overwrite existing output files")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p = sub.add_parser("inventory", help="ffprobe a footage folder")
@@ -172,7 +178,13 @@ def _cmd_plan(args: argparse.Namespace) -> None:
     print(f"wrote {args.out}  {len(edl.events)} events, {edl.duration():.2f}s")
 
 
+def _guard_output(out: Path, force: bool) -> None:
+    if out.exists() and not force:
+        raise MediaError(f"{out} exists; pass --force to overwrite")
+
+
 def _cmd_assemble(args: argparse.Namespace) -> None:
+    _guard_output(args.out, args.force)
     edl = load_edl(args.edl)
     work = args.work or args.out.parent / "work"
     assemble(edl, args.out, work)
@@ -180,6 +192,7 @@ def _cmd_assemble(args: argparse.Namespace) -> None:
 
 
 def _cmd_mix(args: argparse.Namespace) -> None:
+    _guard_output(args.out, args.force)
     mix(
         args.video,
         args.out,
@@ -192,26 +205,31 @@ def _cmd_mix(args: argparse.Namespace) -> None:
 
 
 def _cmd_grade(args: argparse.Namespace) -> None:
+    _guard_output(args.out, args.force)
     grade(args.video, args.out, args.look)
     print(f"wrote {args.out}")
 
 
 def _cmd_titles(args: argparse.Namespace) -> None:
+    _guard_output(args.out, args.force)
     titles(args.video, args.out, title=args.title, subtitle=args.subtitle)
     print(f"wrote {args.out}")
 
 
 def _cmd_captions(args: argparse.Namespace) -> None:
+    _guard_output(args.out, args.force)
     burn_srt(args.video, args.out, args.srt)
     print(f"wrote {args.out}")
 
 
 def _cmd_reframe(args: argparse.Namespace) -> None:
+    _guard_output(args.out, args.force)
     reframe(args.video, args.out, args.aspect)
     print(f"wrote {args.out}")
 
 
 def _cmd_finish(args: argparse.Namespace) -> None:
+    _guard_output(args.out, args.force)
     finish(args.picture, args.out, edl=load_edl(args.edl))
     print(f"wrote {args.out}")
 
@@ -228,6 +246,7 @@ def _cmd_frames(args: argparse.Namespace) -> None:
 
 
 def _cmd_recut(args: argparse.Namespace) -> None:
+    _guard_output(args.out, args.force)
     edl = tighten(load_edl(args.edl), drop_longest=args.drop_longest)
     save_edl(edl, args.out)
     print(f"wrote {args.out}  {len(edl.events)} events, {edl.duration():.2f}s")

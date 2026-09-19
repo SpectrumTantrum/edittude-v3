@@ -17,7 +17,7 @@ def review(video: Path) -> dict[str, Any]:
             "-i",
             str(video),
             "-af",
-            "silencedetect=n=-38dB:d=1.2,ebur128=framelog=verbose",
+            "silencedetect=n=-38dB:d=1.2,ebur128=peak=true:framelog=verbose",
             "-vf",
             "blackdetect=d=0.2:pix_th=0.10,freezedetect=n=-55dB:d=1.4",
             "-f",
@@ -86,17 +86,17 @@ def _paired_spans(log: str, start_key: str, end_key: str) -> list[dict[str, floa
 
 def _parse_loudness(log: str) -> dict[str, float | None]:
     def grab(label: str) -> float | None:
-        match = re.search(rf"{label}:\s+(-?[0-9.]+)", log)
+        match = re.search(rf"{label}:\s+(-?[0-9.]+)", summary)
         return float(match.group(1)) if match else None
 
-    # ebur128 summary uses "I:" "LRA:" "TP:" near "Summary"
+    # ebur128 summary uses "I:", "LRA:", and "Peak:" under "True peak:".
     summary = log
     if "Summary:" in log:
         summary = log[log.rfind("Summary:") :]
     return {
         "I": grab("I"),
         "LRA": grab("LRA"),
-        "TP": grab("Peak") or grab("TP"),
+        "TP": grab(r"True peak:\s+Peak"),
         "thresh": grab("Threshold"),
         "summary": bool("Summary:" in log),
     }

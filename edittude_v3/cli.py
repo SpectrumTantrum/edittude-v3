@@ -78,6 +78,7 @@ def _parser() -> argparse.ArgumentParser:
     config.add_argument("value", nargs="?")
 
     media = sub.add_parser("media", help="local ffmpeg tools (inventory, cut, mix, qc)")
+    media.add_argument("--force", action="store_true", help="overwrite existing output files")
     media.add_argument(
         "media_args",
         nargs=argparse.REMAINDER,
@@ -198,7 +199,10 @@ def cmd_config(*, action: str, name: str | None, value: str | None) -> None:
     if action != "show":
         if name is None or (action == "set" and value is None):
             raise SystemExit("usage: edittude-v3 config set NAME VALUE | config unset NAME")
-        set_setting(name, value if action == "set" else None)
+        try:
+            set_setting(name, value if action == "set" else None)
+        except ValueError as exc:
+            raise SystemExit(str(exc)) from None
     table = Table(show_header=True, header_style=f"bold {ACCENT}")
     for column in ("setting", "value", "variable"):
         table.add_column(column)
@@ -257,6 +261,8 @@ def main(argv: list[str] | None = None) -> None:
             media_args = media_args[1:]
         if not media_args:
             media_args = ["--help"]
+        if args.force:
+            media_args.insert(0, "--force")
         media_main(media_args)
         return
     if args.command == "config":

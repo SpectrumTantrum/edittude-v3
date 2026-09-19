@@ -15,10 +15,11 @@ from edittude_v3.media.inventory import describe_clip
 from edittude_v3.media.titlecard import write_title_png
 
 
-def scale_filter(width: int, height: int) -> str:
+def scale_filter(width: int, height: int, fps: int | None = 30) -> str:
+    fps_filter = f"fps={fps}," if fps is not None else ""
     return (
         f"scale={width}:{height}:force_original_aspect_ratio=increase,"
-        f"crop={width}:{height},fps=30,setsar=1,setpts=PTS-STARTPTS,format=yuv420p"
+        f"crop={width}:{height},{fps_filter}setsar=1,setpts=PTS-STARTPTS,format=yuv420p"
     )
 
 
@@ -29,7 +30,7 @@ def assemble(edl: EditDecision, out: Path, work_dir: Path) -> Path:
     segments: list[Path] = []
     for index, event in enumerate(edl.events):
         dest = work_dir / f"seg_{index:03d}.mp4"
-        _encode_event(event, dest, edl.width, edl.height)
+        _encode_event(event, dest, edl.width, edl.height, fps=int(edl.fps or 30))
         segments.append(dest)
     listing = work_dir / "concat.txt"
     lines = [f"file '{seg.resolve()}'" for seg in segments]
@@ -59,7 +60,7 @@ def assemble(edl: EditDecision, out: Path, work_dir: Path) -> Path:
     return out
 
 
-def _encode_event(event: Event, dest: Path, width: int, height: int) -> None:
+def _encode_event(event: Event, dest: Path, width: int, height: int, fps: int = 30) -> None:
     src = Path(event.src)
     if not src.is_file():
         raise MediaError(f"missing source {src}")
@@ -67,7 +68,7 @@ def _encode_event(event: Event, dest: Path, width: int, height: int) -> None:
     if duration <= 0.04:
         raise MediaError(f"event too short: {event}")
     clip = describe_clip(src)
-    vf = scale_filter(width, height)
+    vf = scale_filter(width, height, fps=fps)
     args = [
         "-ss",
         f"{event.in_point:.3f}",
@@ -300,7 +301,7 @@ def reframe(video: Path, out: Path, aspect: str) -> Path:
     if aspect not in ASPECTS:
         raise MediaError(f"unknown aspect {aspect}. use {', '.join(ASPECTS)}")
     width, height = ASPECTS[aspect]
-    return _video_filter(video, out, scale_filter(width, height).replace(",fps=30,setsar=1,format=yuv420p", ",setsar=1,format=yuv420p"))
+    return _video_filter(video, out, scale_filter(width, height, fps=None))
 
 
 def finish(

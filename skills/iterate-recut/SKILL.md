@@ -11,7 +11,14 @@ Change the EDL. Do not grade your way out of a bad cut.
 edittude-v3 media recut edl.json --out edl2.json --drop-longest
 ```
 
-Then open the new EDL. Drop a duplicate wide. Shorten the longest hold. If loudness failed, remake the mix only. Assemble and `finish` again. QC once more.
+Then open the new EDL. Drop a duplicate wide. Shorten the longest hold. If loudness failed, remake the mix only with `edittude-v3 media --force mix`. Otherwise assemble and `finish` again:
+
+```
+edittude-v3 media --force assemble edl2.json --out picture.mp4
+edittude-v3 media --force finish picture.mp4 edl2.json --out final.mp4
+```
+
+QC once more.
 
 Stop after one honest recut unless they asked to keep going.
 

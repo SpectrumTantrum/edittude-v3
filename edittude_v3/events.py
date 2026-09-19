@@ -5,6 +5,8 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
+from edittude_v3.agent import DEFAULT_RECURSION_LIMIT
+
 
 def content_text(content: object) -> str:
     if isinstance(content, str):
@@ -65,9 +67,15 @@ async def iter_turn(
     prompt: str,
     thread_id: str,
 ) -> AsyncIterator[tuple[str, Any]]:
+    try:
+        recursion_limit = int(os.environ.get("EDITTUDE_RECURSION_LIMIT", DEFAULT_RECURSION_LIMIT))
+    except ValueError:
+        recursion_limit = DEFAULT_RECURSION_LIMIT
+    if recursion_limit <= 0:
+        recursion_limit = DEFAULT_RECURSION_LIMIT
     async for event in agent.astream_events(
         {"messages": [{"role": "user", "content": prompt}]},
-        config={"configurable": {"thread_id": thread_id}, "recursion_limit": int(os.environ.get("EDITTUDE_RECURSION_LIMIT", "400"))},
+        config={"configurable": {"thread_id": thread_id}, "recursion_limit": recursion_limit},
         version="v2",
     ):
         kind = event.get("event")
