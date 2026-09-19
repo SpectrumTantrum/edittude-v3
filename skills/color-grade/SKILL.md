@@ -13,6 +13,8 @@ Looks: `warm`, `cool`, `teal-orange`, `neutral`.
 edittude-v3 media grade picture.mp4 --out graded.mp4 --look warm
 ```
 
+A regrade onto the same output needs `edittude-v3 media --force grade`.
+
 Prefer baking the look in `finish` so you do not encode twice.
 
 Completion: skin is plausible, whites are not cyan, and the look matches the EDL.

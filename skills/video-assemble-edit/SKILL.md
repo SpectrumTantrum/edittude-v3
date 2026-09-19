@@ -9,7 +9,7 @@ metadata:
 
 # Assemble an edit
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `image_describe`.
 
 Turn scene selections and a timing plan into a playable video without losing scene alignment or shortening the intended story through skipped clips.
 
@@ -17,7 +17,7 @@ Turn scene selections and a timing plan into a playable video without losing sce
 
 - Scene IDs, visual descriptions, target timeline `start`/`end`, and candidate source IDs, paths, and `source_start`/`source_end` in seconds.
 - Intended soundtrack or narration, source-audio policy, target aspect ratio/resolution/frame rate, and output path separate from inputs. Use the brief or existing project settings; disclose unresolved delivery choices.
-- Use an available editor, `ffmpeg`/`ffprobe`, or installed MoviePy. Inspect the installed interface before using version-specific library methods. Image inspection or playback is needed for shot selection and quality review.
+- Use an available editor, `ffmpeg`/`ffprobe`, or installed MoviePy. Inspect the installed interface before using version-specific library methods. Image inspection or playback is needed for shot selection and quality review; `image_describe` reads extracted frames when it is configured.
 - If rendering or decoding support is missing, deliver the validated edit decision list and name the missing capability. Do not claim a rendered result.
 
 ## Workflow

@@ -13,6 +13,8 @@ This machine's ffmpeg has no `drawtext` and no `subtitles` filter. The working p
 edittude-v3 media titles picture.mp4 --out titled.mp4 --title "A DAY OUT" --subtitle "city / date"
 ```
 
+A second card onto the same output needs `edittude-v3 media --force titles`.
+
 Set `title` and `subtitle` on the EDL and use `finish` when you still have grade and mix to do.
 
 Title and subtitle are uppercased before drawing. Only A-Z, 0-9, space, `-`, `'`, `.` and `/` have glyphs; anything else raises before the card is written. Punctuate around that, or drop the character.

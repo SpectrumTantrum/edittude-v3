@@ -9,7 +9,7 @@ metadata:
 
 # Separate stems
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`. Other helpers if present: `audio_separate`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `audio_separate`.
 
 ## Inputs and result
 
@@ -18,7 +18,7 @@ Take audio paths or a directory, the wanted stem types, and a fresh output direc
 ## Workflow
 
 1. Inspect the mix. Extract audio from video when needed. Select an available separation model that supports the requested stems; a music-vocal model may leave sound effects or dialogue in both outputs.
-2. Inspect the installed tool's help or documented interface before invocation. The original role invokes fish-audio-preprocess `fap separate`; Demucs or an editor's supported stem separator can perform the same capability. Check model availability and its permitted use before downloading or running it. A simple EQ or a stereo center-channel subtraction is not equivalent to learned source separation.
+2. Inspect the installed tool's help or documented interface before invocation. The original role invokes fish-audio-preprocess `fap separate`; Demucs or an editor's supported stem separator can perform the same capability. Check model availability with `get_capabilities`, and its permitted use, before downloading or running it. A simple EQ or a stereo center-channel subtraction is not equivalent to learned source separation.
 3. Run into a new directory with a unique source-to-output mapping. For chunked inference, use the tool's overlap handling and retain offsets so chunks rejoin without missing samples.
 4. Locate the files actually written; do not infer output filenames from the requested path. Inspect every stem's duration, sample rate, channels, and decoding. Keep all stems on the same timeline.
 5. Compare the original, isolated voice, accompaniment, and recombined stems. Listen to consonants, reverb tails, sibilants, and music transients. Reject or qualify watery speech, missing syllables, residual lead vocals, or audible seams.

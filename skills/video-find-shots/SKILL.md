@@ -9,7 +9,7 @@ metadata:
 
 # Find shots
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `image_describe`.
 
 Find footage that can support each requested scene and fit its duration. Keep scene identity intact through retrieval and selection.
 
@@ -17,7 +17,7 @@ Find footage that can support each requested scene and fit its duration. Keep sc
 
 - Ordered scenes with stable `id`, a `visual_query`, required duration or timeline `start`/`end`, and any subject, continuity, or framing constraints.
 - A footage index containing source IDs, paths, source intervals, and inspected descriptions; source media for candidate verification.
-- Use available text search for a small index or an existing semantic search tool for a larger one. Use frame extraction, video playback, or an editor preview to verify matches.
+- Use available text search for a small index or an existing semantic search tool for a larger one. Use frame extraction with `image_describe`, video playback, or an editor preview to verify matches.
 - Missing index: build or inspect enough source records to support the requested scope. Missing media or visual inspection: label candidates unverified and report the exact dependency instead of declaring a match.
 
 ## Workflow

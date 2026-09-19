@@ -9,7 +9,7 @@ metadata:
 
 # Transcribe a melody for video
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`. Other helpers if present: `score_read`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `score_read`.
 
 Produce a score that preserves the vocal melody, rests, and lyric placement on the audio timeline. The source role analyzes MIDI; audio-to-MIDI transcription is a separate capability and requires listening checks.
 
@@ -37,11 +37,11 @@ Return `name` and the absolute `analysis_path`. The JSON contract shared with ly
 ```json
 {
   "name": "song",
-  "language": "en",
+  "language": "zh",
   "duration_seconds": 2.0,
   "units": [
     {"id": 1, "kind": "rest", "text": "", "start": 0.0, "end": 0.5, "notes": []},
-    {"id": 2, "kind": "lyric", "text": "home", "start": 0.5, "end": 2.0,
+    {"id": 2, "kind": "lyric", "text": "家", "start": 0.5, "end": 2.0,
      "notes": [{"pitch": "C4", "start": 0.5, "end": 1.0},
                {"pitch": "D4", "start": 1.0, "end": 2.0}]}
   ]
@@ -50,7 +50,7 @@ Return `name` and the absolute `analysis_path`. The JSON contract shared with ly
 
 `units` are ordered, nonoverlapping intervals covering `0..duration_seconds`. Each lyric unit contains sequential notes that cover its interval. Rest units contain no notes. Times are seconds relative to audio start, not project timecode. Record a project placement offset separately when supplied. Retain enough precision for later sample-boundary rounding.
 
-For the original DiffSinger word-level interchange, `text` uses `AP` at rests, `notes` and `notes_duration` use ` | ` between lyric units, and spaces within a unit represent sequential notes and matching durations. `input_type` is `word`. Export this only when the selected language frontend can tokenize the lyrics consistently. Store the explicit units as the authoritative timing data.
+For the original DiffSinger word-level interchange, `text` uses `AP` at rests, `notes` and `notes_duration` use ` | ` between lyric units, and spaces within a unit represent sequential notes and matching durations. `input_type` is `word`. Export this only when the selected language frontend can tokenize the lyrics consistently. Store the explicit units as the authoritative timing data. The bundled `singing_synthesize` adapter takes Mandarin only, one Chinese character per lyric unit, as in the example above.
 
 ## Verification
 

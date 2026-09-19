@@ -29,6 +29,7 @@
       "source_path": "environment/roles/separator.py",
       "source_sha256": "e1e3ab689526f380c50c1051a1a54130d430d7e20b32939b018f9ed01f834280",
       "tools": [
+        "get_capabilities",
         "media_inspect",
         "audio_separate"
       ]
@@ -39,6 +40,7 @@
       "source_path": "environment/roles/transcriber.py",
       "source_sha256": "bf8cf65dc1edf283cc91ec89b04027c2ba38d1b953fc5d62a02cdabbfcf873bb",
       "tools": [
+        "get_capabilities",
         "media_inspect",
         "speech_transcribe"
       ]
@@ -91,6 +93,7 @@
       "source_sha256": "7c5abe5630907c4a05d9dee9c751e43f8d54037a48ff837e8011dbc2943de157",
       "tools": [
         "media_inspect",
+        "image_describe",
         "media_render"
       ]
     },
@@ -100,7 +103,8 @@
       "source_path": "environment/roles/vid_preloader.py",
       "source_sha256": "8be4782d2e6156bc0809959b5cda726b1d405d51a3d1b2ae28b5cebc689c0e23",
       "tools": [
-        "media_inspect"
+        "media_inspect",
+        "image_describe"
       ]
     },
     {
@@ -109,7 +113,8 @@
       "source_path": "environment/roles/vid_searcher.py",
       "source_sha256": "72561d8f89cbd15207833379d3ef3fc8cbc3db1fd8b96a9667ea387f3ca530ff",
       "tools": [
-        "media_inspect"
+        "media_inspect",
+        "image_describe"
       ]
     },
     {
@@ -188,6 +193,7 @@
       "source_path": "environment/roles/svc/svc_single.py",
       "source_sha256": "00da709cdd914fa1dd0ed39bcbbaba0f7b5ebc1b949a8630e0e63f8436a722b8",
       "tools": [
+        "get_capabilities",
         "media_inspect",
         "singing_synthesize",
         "media_render"
@@ -199,6 +205,7 @@
       "source_path": "environment/roles/svc/svc_coverist.py",
       "source_sha256": "d39c17568f05c630720943545ef4d84b2a6a4a2fbd412ae9178c16478350b9d6",
       "tools": [
+        "get_capabilities",
         "media_inspect",
         "voice_convert"
       ]
