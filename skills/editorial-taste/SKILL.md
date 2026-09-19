@@ -22,7 +22,7 @@ If a voiceover exists, picture serves it. Fit duration to the VO. Keep ambient, 
 ## Plan
 
 ```
-edittude-v3 media plan INVENTORY.json --out edl.json --title "TITLE" --aspect 16:9 --look warm
+edittude-v3 media plan INVENTORY.json --out edl.json --title "TITLE" --aspect source --look warm
 ```
 
 Then open `edl.json` and rewrite reasons until each event earns its place. Drop a duplicate. Shorten a screen. Move a detail next to the wide it explains.

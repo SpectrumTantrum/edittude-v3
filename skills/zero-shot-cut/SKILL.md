@@ -16,7 +16,7 @@ Make a finished piece from a folder. Do not wait for an EDL.
 5. Read `assembly`, `mix`, `color-grade`, `titles`. Render picture, then `finish`. Completion: `final.mp4` on disk.
 6. Read `review-qc`. If it fails, read `iterate-recut` and go again once. Completion: `qc.json` plus a path you would show a person.
 
-Default delivery: 16:9, warm look, VO if present, one title. Write large files outside the repo.
+Default delivery: the source frame, warm look, VO if present, one title. Write large files outside the repo.
 
 ```
 edittude-v3 media proof FOLDER --out OUTDIR --title "TITLE"

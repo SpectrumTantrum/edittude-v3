@@ -40,7 +40,9 @@ Added as `skills/<name>/SKILL.md`. More will land later. The ones that exist now
 - review-qc
 - iterate-recut
 
-iPhone rotation tags are display-matrix. ffmpeg applies them on decode. Do not transpose again.
+iPhone rotation tags are display-matrix. ffmpeg applies them on decode. Do not transpose again. Read `display_width`/`display_height` from the inventory for the frame as it plays; coded `width`/`height` are pre-rotation, so a portrait clip reports 1920x1080 with rotation ±90.
+
+Delivery matches the source: `--aspect source` is the default and the canvas is the display resolution of the clip with the most screen time. Name an aspect only when the brief does. Off-aspect clips pad onto the canvas (`--fit pad`); `--fit crop` fills and center-crops. Cropping inside a shot is per-event `zoom` with `cx`/`cy`, and it is an upscale, so keep it modest on 1080p.
 
 `media recut EDL --drop-longest` drops one long interior event, then refits
 the rest to the voiceover. Total length stays near the VO. Opening shots often

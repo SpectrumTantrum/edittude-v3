@@ -69,6 +69,10 @@ def describe_clip(path: Path) -> dict[str, Any]:
     suffix = path.suffix.lower()
     kind = "video" if suffix in VIDEO_EXTS else "audio"
     duration = float(fmt.get("duration") or video.get("duration") or audio.get("duration") or 0)
+    rotation = _rotation(video, probe)
+    display_width, display_height = video.get("width"), video.get("height")
+    if abs(rotation) % 180 == 90:
+        display_width, display_height = display_height, display_width
     return {
         "path": str(path.resolve()),
         "name": path.name,
@@ -76,6 +80,8 @@ def describe_clip(path: Path) -> dict[str, Any]:
         "duration": duration,
         "width": video.get("width"),
         "height": video.get("height"),
+        "display_width": display_width,
+        "display_height": display_height,
         "fps": parse_fps(video.get("r_frame_rate")),
         "avg_fps": parse_fps(video.get("avg_frame_rate")),
         "video_codec": video.get("codec_name"),
@@ -85,7 +91,7 @@ def describe_clip(path: Path) -> dict[str, Any]:
         "channels": audio.get("channels"),
         "size_bytes": int(fmt.get("size") or path.stat().st_size),
         "bit_rate": int(fmt["bit_rate"]) if fmt.get("bit_rate") else None,
-        "rotation": _rotation(video, probe),
+        "rotation": rotation,
         "creation_time": (fmt.get("tags") or {}).get("creation_time")
         or (fmt.get("tags") or {}).get("com.apple.quicktime.creationdate"),
         "has_video": bool(video),
