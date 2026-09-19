@@ -6,6 +6,8 @@
 # From a checkout:
 #
 #   ./install.sh
+#   ./install.sh update [--force]
+#   ./install.sh --with-models[=asr,separation]
 #
 # Optional environment:
 #   EDITTUDE_REPO     git URL to clone when this script is not next to pyproject.toml
@@ -94,18 +96,46 @@ install_uv() {
   die "uv installed but is not on PATH. Open a new shell or add ${HOME}/.local/bin to PATH."
 }
 
+is_edittude_checkout() {
+  [ -f "$1/pyproject.toml" ] && grep -q 'name = "edittude-v3"' "$1/pyproject.toml"
+}
+
+update_checkout() {
+  local dir="$1"
+  local force="${2:-0}"
+  need_cmd git
+  if [ ! -d "${dir}/.git" ]; then
+    die "${dir} is not a git checkout. Re-run the installer."
+  fi
+  if [ "$force" -eq 0 ] && [ -n "$(git -C "$dir" status --porcelain)" ]; then
+    die "${dir} has local changes. Commit them, or run: edittude-v3 update --force"
+  fi
+  info "Updating ${dir}"
+  git -C "$dir" fetch --depth 1 origin "$REF" >&2
+  git -C "$dir" checkout --force -B "$REF" "FETCH_HEAD" >&2
+}
+
 resolve_prefix() {
   local checkout
   if checkout="$(script_dir)"; then
+    if [ "$UPDATE" -eq 1 ]; then
+      update_checkout "$checkout" "$FORCE"
+    fi
     printf '%s\n' "$checkout"
     return 0
   fi
+  if [ "$UPDATE" -eq 1 ]; then
+    if is_edittude_checkout "$PREFIX"; then
+      update_checkout "$PREFIX" "$FORCE"
+      printf '%s\n' "$PREFIX"
+      return 0
+    fi
+    die "No edittude-v3 install at ${PREFIX}. Run the installer first."
+  fi
   need_cmd git
-  if [ -f "${PREFIX}/pyproject.toml" ] && grep -q 'name = "edittude-v3"' "${PREFIX}/pyproject.toml"; then
+  if is_edittude_checkout "$PREFIX"; then
     if [ -d "${PREFIX}/.git" ]; then
-      info "Updating ${PREFIX}"
-      git -C "$PREFIX" fetch --depth 1 origin "$REF"
-      git -C "$PREFIX" checkout --force -B "$REF" "FETCH_HEAD"
+      update_checkout "$PREFIX" 1
     else
       info "Using existing checkout ${PREFIX}"
     fi
@@ -155,6 +185,32 @@ path_contains() {
   esac
 }
 
+UPDATE=0
+FORCE=0
+WITH_MODELS=""
+if [ "${EDITTUDE_UPDATE:-}" = "1" ]; then
+  UPDATE=1
+fi
+if [ "${EDITTUDE_FORCE:-}" = "1" ]; then
+  FORCE=1
+fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    update) UPDATE=1 ;;
+    --force) FORCE=1 ;;
+    --with-models) WITH_MODELS="asr,separation" ;;
+    --with-models=*) WITH_MODELS="${1#*=}" ;;
+    -h|--help)
+      log "Usage: install.sh [update] [--force] [--with-models[=LIST]]"
+      log "  --with-models[=LIST]  also install the neural backends (default: asr,separation)"
+      log "                        about 2.7 GB: torch runtime plus pinned weights"
+      exit 0
+      ;;
+    *) die "Unknown argument: $1. Try: ./install.sh or ./install.sh update" ;;
+  esac
+  shift
+done
+
 if [ "$(id -u)" -eq 0 ]; then
   die "Do not install edittude-v3 as root."
 fi
@@ -163,14 +219,29 @@ log "${bold}edittude-v3${reset}"
 PREFIX="$(resolve_prefix)"
 UV_BIN="$(install_uv)"
 
-info "Syncing Python ${PYTHON_VERSION} dependencies in ${PREFIX}"
-"$UV_BIN" sync --python "$PYTHON_VERSION" --project "$PREFIX"
-
-if [ ! -f "${PREFIX}/.env" ] && [ -f "${PREFIX}/.env.example" ]; then
-  cp "${PREFIX}/.env.example" "${PREFIX}/.env"
-  info "Wrote ${PREFIX}/.env (add DEEPSEEK_API_KEY)"
+if [ "${EDITTUDE_SKIP_SYNC:-}" != "1" ]; then
+  info "Syncing Python ${PYTHON_VERSION} dependencies in ${PREFIX}"
+  "$UV_BIN" sync --python "$PYTHON_VERSION" --project "$PREFIX"
 fi
 
+if [ -n "$WITH_MODELS" ]; then
+  info "Installing neural backends (${WITH_MODELS}); this downloads a few GB"
+  EDITTUDE_ROOT="$PREFIX" "$UV_BIN" run --project "$PREFIX" \
+    edittude-media models install --models "$WITH_MODELS"
+fi
+
+CONFIG_HOME="${EDITTUDE_HOME:-${HOME}/.local/share/edittude-v3}"
+if [ ! -f "${CONFIG_HOME}/.env" ]; then
+  mkdir -p "${CONFIG_HOME}"
+  if [ -f "${PREFIX}/.env.example" ]; then
+    cp "${PREFIX}/.env.example" "${CONFIG_HOME}/.env"
+  else
+    printf 'DEEPSEEK_API_KEY=\n' > "${CONFIG_HOME}/.env"
+  fi
+  info "Wrote ${CONFIG_HOME}/.env"
+fi
+
+write_launcher edittude
 write_launcher edittude-v3
 write_launcher edittude-media
 ok "Launchers in ${BIN_DIR}"
@@ -189,12 +260,17 @@ if ! path_contains "$BIN_DIR"; then
   log "  export PATH=\"${BIN_DIR}:\$PATH\""
 fi
 
+if [ "$UPDATE" -eq 1 ]; then
+  ok "Updated ${PREFIX}"
+  log "  edittude-v3 --version"
+  exit 0
+fi
+
 ok "Installed."
-log
-log "Put a DeepSeek key in ${PREFIX}/.env"
-log "  DEEPSEEK_API_KEY=sk-..."
-log "Get a key from https://platform.deepseek.com"
 log
 log "Then:"
 log "  edittude-v3"
 log "  edittude-v3 ask \"make a cut from /path/to/footage\""
+log "  edittude-v3 update"
+log
+log "First launch asks for a DeepSeek key (https://platform.deepseek.com)."

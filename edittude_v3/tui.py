@@ -4,16 +4,66 @@ import uuid
 from pathlib import Path
 
 import xli
+from rich.box import ROUNDED
+from rich.console import Console, Group, RenderableType
+from rich.panel import Panel
+from rich.text import Text
 
+from edittude_v3 import __version__
 from edittude_v3.agent import MODEL_LABEL, build_agent
 from edittude_v3.events import iter_turn, preview
 from edittude_v3.skills import list_skill_names
+from edittude_v3.tools import list_tool_names
+
+#: The single accent knob for the whole CLI (warm orange).
+ACCENT = "#d7875f"
+
+#: Transcript grammar: muted role labels, accent gutter glyphs, accent composer.
+THEME = xli.CODEX.with_overrides(
+    user_label="you",
+    assistant_label="edittude",
+    user_color="grey50",
+    assistant_color=ACCENT,
+    tool_glyph="⏺",
+    tool_done_glyph="⏺",
+    tool_color=ACCENT,
+    reasoning_color="grey42",
+    plan_color=ACCENT,
+    prompt_glyph="›",
+    prompt_color=f"bold {ACCENT}",
+    command_color=f"bold {ACCENT}",
+    code_theme="ansi_dark",
+)
 
 
 def _history_file(workspace: Path) -> str:
     path = workspace / ".edittude-v3" / "history"
     path.parent.mkdir(parents=True, exist_ok=True)
     return str(path)
+
+
+def _banner(workspace: Path, skills: int, tools: int) -> RenderableType:
+    head = Text()
+    head.append("✻ edittude-v3", style=f"bold {ACCENT}")
+    head.append(f" v{__version__}", style="dim")
+
+    body = Text(style="dim")
+    rows = (
+        ("model", MODEL_LABEL),
+        ("cwd", str(workspace).replace(str(Path.home()), "~", 1)),
+        ("", f"{skills} skills · {tools} tools"),
+    )
+    for i, (key, value) in enumerate(rows):
+        if i:
+            body.append("\n")
+        body.append(f"{key:<6}")
+        body.append(value)
+
+    tips = Text("/help commands · @ mention files · esc interrupt · ctrl-d quit", style="dim")
+    panel = Panel.fit(
+        Group(head, Text(), body), box=ROUNDED, border_style=ACCENT, padding=(1, 2)
+    )
+    return Group(panel, tips)
 
 
 def run_tui(*, workspace: Path, thread: str | None = None) -> None:
@@ -23,7 +73,8 @@ def run_tui(*, workspace: Path, thread: str | None = None) -> None:
 
     ui = xli.UI(
         title="edittude-v3",
-        theme="codex",
+        intro="",  # the banner below replaces the built-in empty-state welcome
+        theme=THEME,
         status_fields=("model", "thread", "skills"),
         history_file=_history_file(workspace),
         notify_after=20,
@@ -124,4 +175,6 @@ def run_tui(*, workspace: Path, thread: str | None = None) -> None:
             close_stream()
             flush_reasoning()
 
+    # ui.print() before run() has no printer attached, so banner goes out directly.
+    Console().print(_banner(workspace, len(skills), len(list_tool_names(workspace))))
     ui.run()

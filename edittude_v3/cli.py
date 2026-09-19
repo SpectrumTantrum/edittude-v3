@@ -2,19 +2,38 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import getpass
+import os
+import subprocess
+import sys
 import uuid
 from pathlib import Path
 
 from rich.console import Console
 from rich.markdown import Markdown
+from rich.markup import escape
 from rich.status import Status
+from rich.table import Table
 
 from edittude_v3 import __version__
-from edittude_v3.agent import MODEL_LABEL, build_agent, default_workspace, load_env
+from edittude_v3.agent import (
+    API_KEY_URL,
+    MODEL_LABEL,
+    build_agent,
+    configured_api_key,
+    default_workspace,
+    load_env,
+    normalize_api_key,
+    require_api_key,
+    save_api_key,
+)
 from edittude_v3.events import iter_turn, preview
-from edittude_v3.skills import list_skill_names, list_skills
+from edittude_v3.paths import install_root
+from edittude_v3.skills import list_skills
 from edittude_v3.tools import list_tool_names
-from edittude_v3.tui import run_tui
+from edittude_v3.tui import ACCENT, run_tui
+
+console = Console()
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -56,6 +75,13 @@ def _parser() -> argparse.ArgumentParser:
         help="arguments forwarded to edittude-media",
     )
 
+    update = sub.add_parser("update", help="pull the latest edittude-v3 into this install")
+    update.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite local changes in the install checkout",
+    )
+
     return parser
 
 
@@ -65,28 +91,58 @@ def _workspace(directory: Path | None) -> Path:
     return directory.expanduser().resolve()
 
 
+def _home(path: Path) -> str:
+    return str(path).replace(str(Path.home()), "~", 1)
+
+
+def ensure_api_key() -> None:
+    if configured_api_key():
+        return
+    if not sys.stdin.isatty():
+        require_api_key()
+    console.print()
+    console.print(f"[bold {ACCENT}]edittude-v3[/] needs a DeepSeek API key.")
+    console.print(f"[dim]Get one at {API_KEY_URL}[/]")
+    console.print()
+    while True:
+        try:
+            key = getpass.getpass("DeepSeek API key: ")
+        except (EOFError, KeyboardInterrupt):
+            raise SystemExit(1)
+        key = normalize_api_key(key)
+        if key:
+            break
+        console.print("[dim]Paste a key to continue.[/]")
+    dest = save_api_key(key)
+    console.print(f"[dim]Saved to {escape(_home(dest))}[/]")
+    console.print()
+
+
 def cmd_chat(*, workspace: Path, thread: str | None) -> None:
-    load_env(workspace)
+    load_env()
+    ensure_api_key()
     run_tui(workspace=workspace, thread=thread)
 
 
 async def _ask_async(prompt: str, workspace: Path, thread: str) -> None:
-    console = Console()
     agent = build_agent(workspace=workspace)
     parts: list[str] = []
-    console.print(f"[bold]edittude-v3[/]  {MODEL_LABEL}  {workspace}")
+    home = escape(_home(workspace))
+    console.print(f"[bold {ACCENT}]edittude-v3[/][dim] · {MODEL_LABEL} · {home}[/]")
+    console.print()
 
-    with Status("thinking", console=console, spinner="dots"):
+    with Status("thinking", console=console, spinner="dots", spinner_style=ACCENT):
         async for kind, payload in iter_turn(agent, prompt, thread):
             if kind == "text":
                 parts.append(payload)
             elif kind == "tool_start":
-                name = payload["name"]
+                name = escape(payload["name"])
                 args = payload.get("args") or {}
                 hint = args.get("file_path") or args.get("query") or args.get("command") or ""
-                console.print(f"[dim]  {name} {hint}[/]")
+                console.print(f"  [{ACCENT}]⏺[/] [bold]{name}[/] [dim]{escape(str(hint))}[/]")
             elif kind == "tool_end":
-                console.print(f"[dim]  done[/] {preview(payload.get('output'), limit=80)}")
+                out = escape(preview(payload.get("output"), limit=80))
+                console.print(f"  [dim]⎿ {out}[/]")
 
     text = "".join(parts).strip()
     if text:
@@ -96,29 +152,54 @@ async def _ask_async(prompt: str, workspace: Path, thread: str) -> None:
 
 
 def cmd_ask(*, workspace: Path, prompt: str, thread: str | None) -> None:
-    load_env(workspace)
+    load_env()
+    ensure_api_key()
     asyncio.run(_ask_async(prompt, workspace, thread or uuid.uuid4().hex))
 
 
 def cmd_skills(*, workspace: Path) -> None:
     rows = list_skills(workspace)
     if not rows:
-        print("No skills yet. Add folders under skills/<name>/SKILL.md")
+        console.print("[dim]No skills yet. Add folders under skills/<name>/SKILL.md[/]")
         return
-    print(f"{len(rows)} skill(s):")
+    console.print(f"[bold]{len(rows)} skill{'' if len(rows) == 1 else 's'}[/]")
+    table = Table(box=None, show_header=False, padding=(0, 2, 0, 2))
+    table.add_column(style=f"bold {ACCENT}")
+    table.add_column(style="dim")
     for name, description in rows:
-        extra = f"  {description}" if description else ""
-        print(f"  {name}{extra}")
+        table.add_row(escape(name), escape(description or ""))
+    console.print(table)
 
 
 def cmd_tools(*, workspace: Path) -> None:
     names = list_tool_names(workspace)
     if not names:
-        print("No tools. Add tools/__init__.py exporting get_tools(workspace).")
+        console.print("[dim]No tools. Add tools/__init__.py exporting get_tools(workspace).[/]")
         return
-    print(f"{len(names)} tool(s):")
+    console.print(f"[bold]{len(names)} tool{'' if len(names) == 1 else 's'}[/]")
+    table = Table(box=None, show_header=False, padding=(0, 2, 0, 2))
+    table.add_column(style=f"bold {ACCENT}")
     for name in names:
-        print(f"  {name}")
+        table.add_row(escape(name))
+    console.print(table)
+
+
+def cmd_update(*, force: bool = False) -> None:
+    root = install_root()
+    installer = root / "install.sh"
+    if not installer.is_file():
+        console.print(
+            f"[bold red]error[/] no installer at {escape(str(installer))}. "
+            "This copy cannot update itself."
+        )
+        raise SystemExit(1)
+    env = os.environ.copy()
+    env["EDITTUDE_UPDATE"] = "1"
+    if force:
+        env["EDITTUDE_FORCE"] = "1"
+    result = subprocess.run(["bash", str(installer), "update"], env=env, check=False)
+    if result.returncode:
+        raise SystemExit(result.returncode)
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -152,6 +233,9 @@ def main(argv: list[str] | None = None) -> None:
         if not media_args:
             media_args = ["--help"]
         media_main(media_args)
+        return
+    if args.command == "update":
+        cmd_update(force=args.force)
         return
 
     parser.print_help()

@@ -13,6 +13,25 @@ class CapabilityUnavailable(RuntimeError):
     """An optional executable, package, or model is unavailable."""
 
 
+# These three mirror edittude_v3.paths; tools/ stays importable without the harness.
+def install_root() -> Path:
+    """Checkout that holds skills/, tools/, models/ and the model runtime."""
+    override = os.environ.get("EDITTUDE_ROOT")
+    if override:
+        return Path(override).expanduser().resolve()
+    return Path(__file__).resolve().parent.parent
+
+
+def models_root() -> Path:
+    """Directory holding installed model weights."""
+    return Path(os.environ.get("EDITTUDE_MODELS_DIR") or install_root() / "models").expanduser().resolve()
+
+
+def model_python() -> Path:
+    """Interpreter of the separate model virtualenv; may not exist until installed."""
+    return install_root() / ".venv-models" / "bin" / "python"
+
+
 def _path(root: Path, value: str) -> Path:
     root = root.resolve(strict=True)
     if not isinstance(value, str) or not value.strip() or "\x00" in value or "\\" in value:

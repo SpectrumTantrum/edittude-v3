@@ -206,7 +206,7 @@ class HarnessTest(unittest.TestCase):
         with patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}), contextlib.redirect_stdout(output):
             main(["tools", "-C", str(ROOT)])
         lines = output.getvalue().splitlines()
-        self.assertEqual(lines[0], "10 tool(s):")
+        self.assertEqual(lines[0], "10 tools")
         self.assertEqual({line.strip() for line in lines[1:]}, MEDIA_TOOLS)
 
     def test_tool_errors_are_returned_to_the_agent(self):

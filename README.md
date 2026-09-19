@@ -10,17 +10,11 @@ It inventories a footage folder, plans a cut, renders with ffmpeg, mixes voiceov
 curl -LsSf https://raw.githubusercontent.com/SpectrumTantrum/edittude-v3/main/install.sh | bash
 ```
 
-That installs `uv` if needed, syncs the project, and puts `edittude-v3` in `~/.local/bin`. From a checkout you can run `./install.sh` instead.
+That installs `uv` if needed, syncs the project, and puts `edittude-v3` in `~/.local/bin`. From a checkout you can run `./install.sh` instead. Later, `edittude-v3 update` refreshes that same install.
 
 ffmpeg and ffprobe must be on PATH. On a Mac: `brew install ffmpeg`.
 
-Put a DeepSeek key in the `.env` the installer printed, or in the folder you run from:
-
-```
-DEEPSEEK_API_KEY=sk-...
-```
-
-Get a key from https://platform.deepseek.com
+First launch asks for a DeepSeek API key and writes it to `~/.local/share/edittude-v3/.env`. Get a key from https://platform.deepseek.com. That file is the only place the app looks, besides `DEEPSEEK_API_KEY` already in the environment.
 
 ## CLI
 
@@ -29,8 +23,11 @@ edittude-v3
 edittude-v3 ask "make a cut from /path/to/footage"
 edittude-v3 skills
 edittude-v3 media --help
+edittude-v3 update
 edittude-v3 -C /path/to/project
 ```
+
+`edittude-v3 update` pulls the latest checkout into the current install, then re-syncs. Use `--force` if that checkout has local edits you want overwritten.
 
 `edittude-v3` with no args opens a session in the current directory. Transcript stays in normal terminal scrollback. The composer sits at the bottom.
 
@@ -55,6 +52,18 @@ edittude-v3 media proof FOLDER --out /path/to/artifacts
 ```
 
 Write large renders next to the footage, not into this repo.
+
+## Neural models (opt-in)
+
+Transcription and stem separation need extra runtimes and weights. Nothing is downloaded unless you ask:
+
+```bash
+./install.sh --with-models              # or --with-models=asr,separation
+edittude-media models install           # same thing, after the fact
+edittude-media models install --check   # status only, no network
+```
+
+That creates a separate `.venv-models` (Python 3.11, torch) beside the install and puts weights in `models/`; the agent's own virtualenv is untouched. Budget about 2.5 GB for the torch runtime plus `asr` roughly 0.15 GB and `separation` roughly 0.1-0.35 GB of weights. Override locations with `EDITTUDE_MODELS_DIR`, `EDITTUDE_MODEL_PYTHON`, or the per-backend `EDITTUDE_*` variables.
 
 ## Keys
 

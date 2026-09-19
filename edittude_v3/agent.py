@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -11,13 +12,16 @@ from langgraph.checkpoint.memory import InMemorySaver
 from deepagents import create_deep_agent
 from deepagents.backends import LocalShellBackend
 
-from edittude_v3.paths import PACKAGE_ROOT, install_root
+from edittude_v3.paths import PACKAGE_ROOT, env_file, install_root
 from edittude_v3.skills import skill_dirs
 from edittude_v3.subagents import video_subagents
 from edittude_v3.tools import load_workspace_tools
 
 MODEL = "deepseek:deepseek-flash"
 MODEL_LABEL = "DeepSeek Flash"
+API_KEY_ENV = "DEEPSEEK_API_KEY"
+API_KEY_URL = "https://platform.deepseek.com"
+_API_KEY_LINE = re.compile(rf"^(?:export\s+)?{API_KEY_ENV}=.*$", re.MULTILINE)
 
 SYSTEM_PROMPT = """You are edittude-v3, a local cutter.
 
@@ -64,18 +68,85 @@ def default_workspace() -> Path:
     return Path.cwd().resolve()
 
 
-def load_env(workspace: Path | None = None) -> None:
-    workspace = workspace or default_workspace()
-    load_dotenv(install_root() / ".env")
-    load_dotenv(PACKAGE_ROOT / ".env")
-    load_dotenv(workspace / ".env")
+def _key_from_file(path: Path) -> str:
+    if not path.is_file():
+        return ""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("export "):
+            stripped = stripped[7:].strip()
+        if stripped.startswith(f"{API_KEY_ENV}="):
+            return normalize_api_key(stripped)
+    return ""
+
+
+def _legacy_env_files() -> list[Path]:
+    home = env_file().resolve()
+    found: list[Path] = []
+    seen: set[Path] = {home}
+    for path in (install_root() / ".env", PACKAGE_ROOT / ".env"):
+        resolved = path.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        found.append(path)
+    return found
+
+
+def load_env() -> None:
+    path = env_file()
+    load_dotenv(path)
+    if configured_api_key():
+        return
+    for candidate in _legacy_env_files():
+        key = _key_from_file(candidate)
+        if key:
+            save_api_key(key, path)
+            return
+
+
+def configured_api_key() -> str:
+    return os.getenv(API_KEY_ENV, "").strip()
+
+
+def normalize_api_key(raw: str) -> str:
+    key = raw.strip().strip("'\"")
+    prefix = f"{API_KEY_ENV}="
+    if key.startswith(prefix):
+        key = key[len(prefix):].strip().strip("'\"")
+    return key
+
+
+def save_api_key(key: str, path: Path | None = None) -> Path:
+    key = normalize_api_key(key)
+    if not key:
+        raise ValueError("API key is empty")
+    path = path or env_file()
+    line = f"{API_KEY_ENV}={key}"
+    if path.is_file():
+        text = path.read_text(encoding="utf-8")
+        if _API_KEY_LINE.search(text):
+            text = _API_KEY_LINE.sub(lambda _: line, text, count=1)
+        else:
+            text = text.rstrip("\n")
+            text = f"{text}\n{line}" if text else line
+        if not text.endswith("\n"):
+            text += "\n"
+        path.write_text(text, encoding="utf-8")
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(line + "\n", encoding="utf-8")
+    path.chmod(0o600)
+    os.environ[API_KEY_ENV] = key
+    return path
 
 
 def require_api_key() -> None:
-    if os.getenv("DEEPSEEK_API_KEY"):
+    if configured_api_key():
         return
     raise SystemExit(
-        "DEEPSEEK_API_KEY is missing. Add it to the install .env or the project .env."
+        f"{API_KEY_ENV} is missing. Run edittude-v3 in a terminal to paste a key, "
+        f"or add it to {env_file()}."
     )
 
 

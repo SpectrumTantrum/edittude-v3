@@ -131,6 +131,12 @@ def _parser() -> argparse.ArgumentParser:
     p.add_argument("--no-thumbs", action="store_true")
     p.set_defaults(func=_cmd_proof)
 
+    p = sub.add_parser("models", help="install the optional neural model runtime and weights")
+    p.add_argument("action", choices=("install",))
+    p.add_argument("--models", default="asr,separation")
+    p.add_argument("--check", action="store_true")
+    p.set_defaults(func=_cmd_models)
+
     return parser
 
 
@@ -225,6 +231,22 @@ def _cmd_recut(args: argparse.Namespace) -> None:
     edl = tighten(load_edl(args.edl), drop_longest=args.drop_longest)
     save_edl(edl, args.out)
     print(f"wrote {args.out}  {len(edl.events)} events, {edl.duration():.2f}s")
+
+
+def _cmd_models(args: argparse.Namespace) -> None:
+    # tools/ is portable and must not import the harness, so run it as its own script.
+    import subprocess
+    import sys
+
+    from edittude_v3.paths import PACKAGE_ROOT, install_root
+
+    # EDITTUDE_ROOT may point at a models-only root, so fall back to the shipped copy.
+    script = next((root / "tools/install_models.py" for root in (install_root(), PACKAGE_ROOT)
+                   if (root / "tools/install_models.py").is_file()), None)
+    if script is None:
+        raise SystemExit(f"tools/install_models.py is missing from {install_root()}")
+    forwarded = ["--models", args.models] + (["--check"] if args.check else [])
+    raise SystemExit(subprocess.run([sys.executable, str(script), *forwarded]).returncode)
 
 
 def _cmd_proof(args: argparse.Namespace) -> None:

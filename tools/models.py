@@ -12,7 +12,19 @@ import subprocess
 import sys
 import tempfile
 
-from .common import CapabilityUnavailable, artifact_path, input_path, output_path as resolve_output, probe, publish, run
+from .common import (CapabilityUnavailable, artifact_path, input_path, model_python, models_root,
+                     output_path as resolve_output, probe, publish, run)
+
+INSTALL_HINT = "run: edittude-media models install"
+# Weights installed by tools/install_models.py, relative to models_root().
+DEFAULTS = {
+    "EDITTUDE_ASR_MODEL_DIR": "asr/faster-whisper-base",
+    "EDITTUDE_DEMUCS_REPO": "demucs",
+    "EDITTUDE_SEED_VC_DIR": "seed-vc",
+    "EDITTUDE_SEED_VC_CHECKPOINT": "seed-vc/ckpt/model.pth",
+    "EDITTUDE_SEED_VC_CONFIG": "seed-vc/ckpt/config.yml",
+    "EDITTUDE_DIFFSINGER_DIR": "DiffSinger",
+}
 
 
 _OFFLINE_ENV = {
@@ -30,20 +42,26 @@ socket.create_connection = _network_disabled
 
 
 def _runtime(backend: str) -> str:
-    value = os.environ.get(f"EDITTUDE_{backend}_PYTHON") or os.environ.get("EDITTUDE_MODEL_PYTHON") or sys.executable
+    installed = model_python()
+    value = (os.environ.get(f"EDITTUDE_{backend}_PYTHON") or os.environ.get("EDITTUDE_MODEL_PYTHON")
+             or (str(installed) if installed.is_file() else sys.executable))
     executable = shutil.which(value) or str(Path(value).expanduser())
     if not Path(executable).is_file() or not os.access(executable, os.X_OK):
-        raise CapabilityUnavailable(f"Python runtime unavailable: {value}; set EDITTUDE_{backend}_PYTHON")
+        raise CapabilityUnavailable(f"Python runtime unavailable: {value}; {INSTALL_HINT}, or set EDITTUDE_{backend}_PYTHON")
     return executable
 
 
 def _configured_path(name: str, *, directory: bool = True) -> Path:
+    """Resolve an env override, else the installed default under models_root()."""
     value = os.environ.get(name)
-    if not value:
-        raise CapabilityUnavailable(f"Set {name} to an existing local {'directory' if directory else 'file'}; downloads are disabled")
-    path = Path(value).expanduser().resolve()
+    kind = "directory" if directory else "file"
+    default = DEFAULTS.get(name)
+    if not value and default is None:
+        raise CapabilityUnavailable(f"Set {name} to an existing local {kind}; downloads are disabled")
+    path = Path(value).expanduser().resolve() if value else models_root() / default
     if not (path.is_dir() if directory else path.is_file()):
-        raise CapabilityUnavailable(f"{name} does not identify an existing {'directory' if directory else 'file'}: {path}")
+        raise CapabilityUnavailable(f"{name} does not identify an existing {kind}: {path}" if value
+                                    else f"No installed model {kind} at {path}; {INSTALL_HINT}, or set {name}")
     return path
 
 
@@ -96,7 +114,11 @@ def speech_transcribe(workspace: Path, audio_path: str, output_path: str, langua
         raise ValueError("Transcript output must use .json")
     if not isinstance(model, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*(?:/[A-Za-z0-9][A-Za-z0-9_.-]*)?", model):
         raise ValueError("model must be a cached faster-whisper model name or 'local' with EDITTUDE_ASR_MODEL_DIR configured")
-    model_location = str(_configured_path("EDITTUDE_ASR_MODEL_DIR")) if model == "local" else model
+    # The default 'base' resolves to installed local weights when they exist, so transcription
+    # works straight after the installer with no environment and no downloads.
+    installed_asr = os.environ.get("EDITTUDE_ASR_MODEL_DIR") or (models_root() / DEFAULTS["EDITTUDE_ASR_MODEL_DIR"]).is_dir()
+    model_location = (str(_configured_path("EDITTUDE_ASR_MODEL_DIR"))
+                      if model == "local" or (model == "base" and installed_asr) else model)
     if language is not None and (not isinstance(language, str) or not re.fullmatch(r"[a-z]{2,3}", language)):
         raise ValueError("language must be a supported two- or three-letter language code")
     if source_id is not None and (not isinstance(source_id, str) or not source_id.strip()):
@@ -198,12 +220,15 @@ def audio_separate(workspace: Path, audio_path: str, output_dir: str, model: str
     _audio(source)
     with tempfile.TemporaryDirectory(dir=workspace, prefix=".separate-") as directory:
         temporary = Path(directory)
-        args = ["--repo", repository, "-n", model, "--device", "cpu", "--float32", "-o", temporary]
+        args = ["--repo", repository, "-n", model, "--float32", "-o", temporary]
         if stem:
             args += ["--two-stems", stem]
         _model_run("DEMUCS", """
-import runpy, sys
-sys.argv = ['demucs.separate', *sys.argv[1:]]
+import os, runpy, sys, torch
+os.environ.setdefault('PYTORCH_ENABLE_MPS_FALLBACK', '1')  # Unsupported Metal ops fall back to CPU.
+device = os.environ.get('EDITTUDE_DEVICE') or ('cuda' if torch.cuda.is_available()
+    else 'mps' if torch.backends.mps.is_available() else 'cpu')
+sys.argv = ['demucs.separate', '--device', device, *sys.argv[1:]]
 runpy.run_module('demucs.separate', run_name='__main__')
 """, [*args, source])
         generated = sorted(temporary.rglob("*.wav"))
@@ -364,7 +389,7 @@ def capabilities() -> dict:
         runtime = runtimes.get(backend)
         reason = errors.get(backend) or found.get(runtime, {}).get("error")
         if not reason and not found.get(runtime, {}).get(modules[backend]):
-            reason = f"{modules[backend]} is not installed in the configured Python runtime"
+            reason = f"{modules[backend]} is not installed in the configured Python runtime; {INSTALL_HINT}"
         try:
             if backend == "DEMUCS":
                 _configured_path("EDITTUDE_DEMUCS_REPO")
