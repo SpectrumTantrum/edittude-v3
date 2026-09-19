@@ -5,6 +5,9 @@ import os
 from collections.abc import AsyncIterator
 from typing import Any
 
+from langchain_core.messages import BaseMessage
+from langgraph.types import Command
+
 from edittude_v3.agent import DEFAULT_RECURSION_LIMIT
 
 
@@ -55,6 +58,12 @@ def as_args(raw: object) -> dict[str, Any]:
 
 
 def preview(value: object, limit: int = 400) -> str:
+    if isinstance(value, Command) and isinstance(value.update, dict):
+        messages = value.update.get("messages")
+        if messages:
+            value = messages[-1]
+    if isinstance(value, BaseMessage):
+        value = content_text(value.content)
     text = value if isinstance(value, str) else str(value)
     text = text.strip()
     if len(text) > limit:
