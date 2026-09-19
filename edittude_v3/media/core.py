@@ -11,6 +11,7 @@ VIDEO_EXTS = {".mov", ".mp4", ".m4v", ".mkv", ".avi", ".webm"}
 AUDIO_EXTS = {".m4a", ".aac", ".wav", ".mp3", ".aiff", ".aif", ".flac", ".ogg"}
 SKIP_DIRS = {
     ".edittude",
+    ".edittude-v3",
     ".git",
     ".venv",
     "__pycache__",

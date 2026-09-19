@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -137,6 +139,7 @@ def extract_thumbs(
     out_dir.mkdir(parents=True, exist_ok=True)
     positions = _thumb_positions(count)
     written: list[dict[str, Any]] = []
+    fresh: set[Path] = set()
     for clip_index, clip in enumerate(inventory.get("clips") or []):
         if clip.get("kind") != "video":
             continue
@@ -145,7 +148,9 @@ def extract_thumbs(
         if duration <= 0 or not src.is_file():
             continue
         clip_dir = out_dir / f"{clip_index:03d}_{src.stem}"
+        shutil.rmtree(clip_dir, ignore_errors=True)
         clip_dir.mkdir(parents=True, exist_ok=True)
+        fresh.add(clip_dir)
         frames: list[str] = []
         for index, frac in enumerate(positions):
             t = min(max(duration * frac, 0.04), max(duration - 0.04, 0.04))
@@ -169,6 +174,10 @@ def extract_thumbs(
             )
             frames.append(str(dest))
         written.append({"clip": clip["name"], "path": clip["path"], "frames": frames})
+    # Clip indices shift when the folder changes; drop our own dirs that this run did not write.
+    for stale in out_dir.iterdir():
+        if stale not in fresh and stale.is_dir() and re.match(r"\d{3}_", stale.name):
+            shutil.rmtree(stale, ignore_errors=True)
     return written
 
 

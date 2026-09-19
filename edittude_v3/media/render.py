@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from edittude_v3.media.core import (
@@ -96,6 +97,10 @@ def _encode_event(event: Event, dest: Path, width: int, height: int, fit: str = 
     duration = event.duration()
     if duration <= 0.04:
         raise MediaError(f"event too short: {event}")
+    # The concat demuxer offsets each segment by its container duration, so a segment whose
+    # audio outruns its picture opens a gap per cut and drags the joined frame rate off fps.
+    frames = max(1, round(duration * fps))
+    duration = math.floor(frames / fps * 1e6) / 1e6
     clip = describe_clip(src)
     vf = scale_filter(width, height, fit=fit, zoom=event.zoom, cx=event.cx, cy=event.cy, fps=fps)
     args = [
@@ -113,11 +118,13 @@ def _encode_event(event: Event, dest: Path, width: int, height: int, fit: str = 
         ]
     args += [
         "-t",
-        f"{duration:.3f}",
+        f"{duration:.6f}",
         "-map",
         "0:v:0",
         "-vf",
         vf,
+        "-frames:v",
+        str(frames),
         "-c:v",
         "libx264",
         "-preset",

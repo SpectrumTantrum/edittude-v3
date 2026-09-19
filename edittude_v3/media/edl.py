@@ -202,7 +202,8 @@ def pick_voiceover(inventory: dict[str, Any]) -> dict[str, Any] | None:
     if not audios:
         return None
     ranked = sorted(audios, key=lambda c: (_vo_score(c), c.get("duration") or 0), reverse=True)
-    return ranked[0]
+    # Length alone does not make a narrator; an unnamed track belongs to pick_music.
+    return ranked[0] if _vo_score(ranked[0]) else None
 
 
 def pick_music(inventory: dict[str, Any], voiceover: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -215,6 +216,9 @@ def pick_music(inventory: dict[str, Any], voiceover: dict[str, Any] | None) -> d
         name = clip.get("name", "").lower()
         if any(token in name for token in ("music", "bed", "underscore", "song", "score")):
             candidates.append(clip)
+    if not candidates and voiceover is None:
+        # Nothing claimed the narration slot, so unnamed audio is a bed.
+        candidates = audios
     if not candidates:
         return None
     return max(candidates, key=lambda c: c.get("duration") or 0)

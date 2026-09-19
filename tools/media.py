@@ -627,6 +627,9 @@ def media_render(workspace: Path, request: dict) -> dict:
                 expected = sum(_duration(item, "audio") for item in infos)
                 details = {"paths": [artifact_path(root, source) for source in paths]}
         elif operation in {"extract_audio", "resample"}:
+            missing = [key for key in ("sample_rate", "channels") if operation == "resample" and key not in request]
+            if missing:
+                raise ValueError(f"resample requires {' and '.join(missing)}")
             codec = _audio_codec(destination)
             audio = _stream(info, "audio")
             stream_index = _integer(request.get("stream_index", audio["index"]), "stream_index", 0, 1024)
