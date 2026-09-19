@@ -101,6 +101,10 @@ class EditDecision:
     def __post_init__(self) -> None:
         if self.fit not in ("pad", "crop"):
             raise MediaError("fit must be pad or crop")
+        if self.aspect != "source" and self.aspect not in ASPECTS:
+            raise MediaError(f"unknown aspect {self.aspect}. use source or {', '.join(ASPECTS)}")
+        if self.fps and not 0 < self.fps <= 240:
+            raise MediaError(f"fps must be between 1 and 240, or 0 for the default 30. got {self.fps}")
         if self.aspect == "source":
             for size in (self.canvas_width, self.canvas_height):
                 if size is not None and size <= 0:
@@ -115,6 +119,9 @@ class EditDecision:
                 self.canvas_width = width
             if self.canvas_height is None:
                 self.canvas_height = height
+        # libx264 needs even dimensions; source_canvas rounds, explicit values did not.
+        self.canvas_width = max(2, self.canvas_width // 2 * 2)
+        self.canvas_height = max(2, self.canvas_height // 2 * 2)
         return self.canvas_width, self.canvas_height
 
     @property
@@ -273,7 +280,7 @@ def first_cut(
     return EditDecision(
         events=events,
         title=title,
-        aspect=aspect if aspect in ASPECTS or aspect == "source" else "source",
+        aspect=aspect,
         fit=fit,
         look=look if look in LOOKS else "warm",
         voiceover=voiceover["path"] if voiceover else None,
@@ -296,6 +303,8 @@ def fit_to_duration(events: list[Event], target: float) -> list[Event]:
 
 
 def tighten(edl: EditDecision, *, drop_longest: bool = False) -> EditDecision:
+    # Pin the canvas before durations move, or a source EDL re-derives it from the new holds.
+    edl.canvas_width, edl.canvas_height = edl.width, edl.height
     events = [replace(event) for event in edl.events]
     if drop_longest and len(events) > 4:
         longest = max(range(len(events)), key=lambda i: events[i].duration())

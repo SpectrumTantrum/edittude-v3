@@ -173,6 +173,9 @@ def _cmd_thumbs(args: argparse.Namespace) -> None:
 def _cmd_plan(args: argparse.Namespace) -> None:
     from edittude_v3.media.core import read_json
 
+    _guard_output(args.out, args.force)
+    if args.target is not None and args.target <= 0:
+        raise MediaError("--target must be greater than 0 seconds")
     inventory = read_json(args.inventory)
     edl = first_cut(
         inventory,
@@ -277,6 +280,8 @@ def _cmd_models(args: argparse.Namespace) -> None:
 
 
 def _cmd_proof(args: argparse.Namespace) -> None:
+    for name in ("final.mp4", "edl.json"):
+        _guard_output(args.out / name, args.force)
     evidence = run_proof(
         args.folder,
         args.out,

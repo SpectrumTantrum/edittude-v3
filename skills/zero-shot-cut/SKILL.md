@@ -24,4 +24,6 @@ edittude-v3 media proof FOLDER --out OUTDIR --title "TITLE"
 
 Use `proof` when the brief is thin. Use the stepwise commands when you need to change the EDL by hand.
 
+A second `proof` into the same OUTDIR needs `edittude-v3 media --force proof`; it will not overwrite an existing `final.mp4` or `edl.json` on its own.
+
 A reply that only lists commands is a failed turn. The file has to exist.
