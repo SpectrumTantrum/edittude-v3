@@ -7,13 +7,19 @@ import sys
 import uuid
 from pathlib import Path
 from types import ModuleType
+from typing import get_args
 
+from deepagents.middleware.filesystem import FsToolName
 from langchain_core.tools import BaseTool, ToolException, tool
 
 from edittude_v3.paths import install_root
 
 # One loaded package per tools/__init__.py; the TUI loads tools twice at startup.
 _PACKAGES: dict[Path, ModuleType] = {}
+# deepagents' own tools: the filesystem/shell set plus the subagent `task` tool,
+# which has no exported name constant. A workspace tool reusing one of these
+# replaces it silently, so reject the collision instead.
+_BUILTIN_NAMES = frozenset(get_args(FsToolName)) | {"task"}
 
 
 def _as_tool(item):
@@ -69,14 +75,19 @@ def load_workspace_tools(workspace: Path) -> list[BaseTool]:
         names = [item.name for item in result]
         if len(names) != len(set(names)):
             raise ValueError("get_tools(workspace) returned duplicate tool names")
+        if shadowed := sorted(_BUILTIN_NAMES.intersection(names)):
+            raise ValueError(
+                f"get_tools(workspace) shadows built-in tools: {', '.join(shadowed)}"
+            )
         _PACKAGES[entrypoint] = package
         return result
-    except Exception:
+    except Exception as exc:  # noqa: BLE001 - whatever tools/ raises becomes one line
         _PACKAGES.pop(entrypoint, None)
         for module_name in list(sys.modules):
             if module_name == name or module_name.startswith(name + "."):
                 del sys.modules[module_name]
-        raise
+        # Every caller (chat, ask, tools) wants one line here, not a traceback.
+        raise SystemExit(f"{entrypoint}: {exc}") from None
 
 
 def list_tool_names(workspace: Path) -> list[str]:

@@ -98,7 +98,11 @@ def _parser() -> argparse.ArgumentParser:
 def _workspace(directory: Path | None) -> Path:
     if directory is None:
         return default_workspace()
-    return directory.expanduser().resolve()
+    path = directory.expanduser().resolve()
+    # Without this, a typo'd -C creates the whole tree via state_dir() and runs there.
+    if not path.is_dir():
+        raise SystemExit(f"not a directory: {path}")
+    return path
 
 
 def _home(path: Path) -> str:

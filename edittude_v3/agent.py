@@ -130,6 +130,7 @@ def set_setting(name: str, value: str | None) -> None:
     else:
         set_key(path, var, value)
         os.environ[var] = value
+    path.chmod(0o600)  # touch() is a no-op on an existing file and set_key keeps its mode.
 
 
 def default_workspace() -> Path:
@@ -178,11 +179,14 @@ def configured_api_key() -> str:
 
 
 def normalize_api_key(raw: str) -> str:
-    key = raw.strip().strip("'\"")
+    """Accept sk-…, KEY=sk-…, export KEY=sk-…, and any of those quoted."""
+    key = raw.strip()
+    if key.startswith("export "):
+        key = key[len("export "):].strip()
     prefix = f"{API_KEY_ENV}="
     if key.startswith(prefix):
-        key = key[len(prefix):].strip().strip("'\"")
-    return key
+        key = key[len(prefix):].strip()
+    return key.strip("'\"")
 
 
 def save_api_key(key: str, path: Path | None = None) -> Path:

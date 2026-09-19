@@ -159,15 +159,21 @@ def run_tui(*, workspace: Path, thread: str | None = None) -> None:
         reasoning_buf: list[str] = []
         reasoning_started: float | None = None
         turn_started = time.monotonic()
-        spinner = ui.working("Thinking…")
-        spinner.__enter__()
-        spinning = True
+        spinner = None
+
+        def start_spinner() -> None:
+            nonlocal spinner
+            if spinner is None:
+                spinner = ui.working("Thinking…")
+                spinner.__enter__()
 
         def stop_spinner() -> None:
-            nonlocal spinning
-            if spinning:
+            nonlocal spinner
+            if spinner is not None:
                 spinner.__exit__(None, None, None)
-                spinning = False
+                spinner = None
+
+        start_spinner()
 
         def close_stream() -> None:
             nonlocal stream
@@ -227,6 +233,9 @@ def run_tui(*, workspace: Path, thread: str | None = None) -> None:
                         status=payload.get("status", "done"),
                         output=preview(payload.get("output")),
                     )
+                    # The next model call can be long; show activity again.
+                    if stream is None:
+                        start_spinner()
         finally:
             stop_spinner()
             close_stream()

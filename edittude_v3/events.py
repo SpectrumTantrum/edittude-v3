@@ -36,7 +36,9 @@ def reasoning_text(chunk: object) -> str:
         parts: list[str] = []
         for block in content:
             if isinstance(block, dict) and block.get("type") in {"reasoning", "thinking"}:
-                parts.append(str(block.get("text") or block.get("thinking") or ""))
+                # "reasoning" is langchain-core's standard ReasoningContentBlock key.
+                parts.append(str(block.get("text") or block.get("thinking")
+                                 or block.get("reasoning") or ""))
         return "".join(parts)
     return ""
 
@@ -92,6 +94,12 @@ async def iter_turn(
         run_id = str(event.get("run_id") or "")
 
         if kind == "on_chat_model_stream":
+            # Subagent model calls stream through here too. The parent's checkpoint
+            # namespace is a single "model:…" segment; a nested run carries the
+            # subagent's node as well ("tools:…|model:…"), and its text is the
+            # subagent's report, not the answer.
+            if "|" in str((event.get("metadata") or {}).get("langgraph_checkpoint_ns") or ""):
+                continue
             chunk = data.get("chunk")
             thought = reasoning_text(chunk)
             if thought:

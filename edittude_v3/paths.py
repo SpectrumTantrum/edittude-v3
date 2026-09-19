@@ -29,7 +29,10 @@ def env_file() -> Path:
 def state_dir(workspace: Path) -> Path:
     """Per-project scratch: TUI history, offloaded conversation history, media."""
     path = workspace.expanduser().resolve() / ".edittude-v3"
-    path.mkdir(parents=True, exist_ok=True)
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise SystemExit(f"cannot create {path}: {exc.strerror}") from None
     return path
 
 

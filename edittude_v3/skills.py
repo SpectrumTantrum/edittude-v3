@@ -15,11 +15,20 @@ def skill_dirs(workspace: Path) -> list[Path]:
 
 
 def skill_folders(workspace: Path) -> list[Path]:
+    """Only the folders deepagents loads: a SKILL.md naming itself and a description.
+
+    deepagents skips a SKILL.md whose frontmatter it cannot parse or that omits
+    either field, so falling back to the directory name would list skills the
+    model never receives.
+    """
     found: dict[str, Path] = {}
     for root in skill_dirs(workspace):
         for path in sorted(root.iterdir()):
-            if path.is_dir() and (path / "SKILL.md").is_file():
-                found[skill_name(path / "SKILL.md")] = path
+            if not (path.is_dir() and (path / "SKILL.md").is_file()):
+                continue
+            data = _frontmatter(path / "SKILL.md")
+            if data.get("name") and data.get("description"):
+                found[data["name"]] = path
     return sorted(found.values(), key=lambda path: skill_name(path / "SKILL.md"))
 
 
