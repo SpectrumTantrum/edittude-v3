@@ -9,7 +9,7 @@ metadata:
 
 # Convert a singing voice
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`. Other helpers if present: `voice_convert`. Pass the skill's `target_vocal_path` as the callable's `reference_audio_path`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `voice_convert`. Pass the skill's `target_vocal_path` as the callable's `reference_audio_path`.
 
 Change vocal timbre while retaining the source performance's lyrics, pitch contour, rhythm, and placement. The output is a dry converted vocal stem for mixing.
 
@@ -17,7 +17,7 @@ Change vocal timbre while retaining the source performance's lyrics, pitch conto
 
 - Required: `audio_path`, the source singing vocal; `target_vocal_path`, the user-provided or authorized target reference; and an output destination.
 - Carry the source's timeline offset, duration, sample rate, and any score or lyric alignment supplied by the preceding stage.
-- Use an available singing voice conversion system such as Seed-VC with pitch conditioning enabled. Inspect the installed interface and model support before forming a command.
+- Use an available singing voice conversion system such as Seed-VC with pitch conditioning enabled. Inspect the installed interface and read `get_capabilities` for model support before forming a command.
 - Confirm that the target reference is intended for this conversion. Keep the requested voice identity and permitted use within the user's scope; do not replace it with an unrelated identifiable singer.
 - Missing conversion weights, compatible compute, or target reference blocks rendering. Report the specific missing item and keep the usable source stem.
 

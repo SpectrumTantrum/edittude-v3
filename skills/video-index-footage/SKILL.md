@@ -9,7 +9,7 @@ metadata:
 
 # Index footage
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `image_describe`.
 
 Create a searchable inventory that preserves the link between every description and its source interval. This skill produces an index, not an edited video.
 
@@ -17,7 +17,7 @@ Create a searchable inventory that preserves the link between every description 
 
 - Source files or a directory, indexing scope, and an output location separate from source media.
 - Optional existing scene index, transcript files, and desired granularity. Reuse records only when their source identity and duration still match.
-- Use available media inspection and extraction tools such as `ffprobe`, `ffmpeg`, an editor's scene detector, or an installed video library. Use available speech recognition and image inspection for semantic records. Embeddings are optional.
+- Use available media inspection and extraction tools such as `ffprobe`, `ffmpeg`, an editor's scene detector, or an installed video library. Use available speech recognition and image inspection for semantic records; `image_describe` reads extracted frames when it is configured. Embeddings are optional.
 - If media cannot be decoded, report the file and missing decoder. If visual inspection or speech recognition is unavailable, mark that field unavailable. Metadata alone is not a semantic index.
 
 ## Workflow

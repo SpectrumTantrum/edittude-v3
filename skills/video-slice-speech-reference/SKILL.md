@@ -9,7 +9,7 @@ metadata:
 
 # Slice speech references
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`. Other helpers if present: `speech_transcribe`, `audio_timing`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `speech_transcribe`, `audio_timing`.
 
 Create speech clips that retain their exact positions in the source recording. The manifest is the link back to the video when rewritten audio replaces the performance.
 
@@ -17,7 +17,7 @@ Create speech clips that retain their exact positions in the source recording. T
 
 - Source audio path, output directory, and its offset relative to the source video if audio time zero differs.
 - Any known speaker boundaries and the intended synthesis backend's reference duration limits.
-- Optional slice settings. The original started with about 6-8 second clips, 0.5 seconds of silence, a -35 dBFS RMS threshold, 10 ms analysis hops, and up to 0.3 seconds of retained silence. These are starting points, not universal thresholds.
+- Optional slice settings. The original started with about 6-8 second clips, 0.5 seconds of silence, a -35 dBFS RMS threshold, 10 ms analysis windows (`audio_timing` `window_ms`, which has no separate hop), and up to 0.3 seconds of retained silence. These are starting points, not universal thresholds.
 
 ## Workflow
 

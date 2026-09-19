@@ -9,7 +9,7 @@ metadata:
 
 # Detect rhythm cues
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`. Other helpers if present: `audio_timing`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `audio_timing`.
 
 Measure candidate cut points from the audio, then distinguish detected musical events from the smaller set chosen for editing.
 
@@ -38,7 +38,7 @@ All times are seconds relative to the soundtrack start; an analyzed subrange ret
   "audio_path": "music/theme.wav",
   "duration": 12.0,
   "method": "rms-peaks",
-  "settings": {"sample_rate": 48000, "hop_length": 512, "minimum_interval": 1.5},
+  "settings": {"sample_rate": 16000, "window_ms": 50, "threshold_ratio": 0.35, "minimum_interval": 1.5},
   "events": [{"id": "event-01", "time": 4.0, "kind": "energy_peak"}],
   "cut_points": [{"id": "cut-01", "time": 4.0, "event_id": "event-01"}],
   "boundaries": [0.0, 4.0, 12.0],

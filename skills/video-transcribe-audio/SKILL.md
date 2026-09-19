@@ -9,7 +9,7 @@ metadata:
 
 # Transcribe audio
 
-For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, reframe, finish, qc, frames, recut. Do not call `media_inspect` or `media_render`. Other helpers if present: `speech_transcribe`.
+For footage and renders use `uv run edittude-v3 media` (same as `python -m edittude_v3.media`): inventory, thumbs, plan, assemble, mix, grade, titles, captions (needs an ffmpeg with libass), reframe, finish, qc, frames, recut, proof. Do not call `media_inspect` or `media_render`. Other helpers if present: `speech_transcribe`.
 
 ## Inputs and result
 
@@ -26,7 +26,7 @@ For a speech-slice manifest, use each slice's existing `id` as the transcript's 
 ## Workflow
 
 1. Inspect audio and extract the selected stream from video if needed. Preserve the original and record any extraction offset. Avoid summing separate speakers' channels before deciding whether channel-based transcription is useful.
-2. Choose an available ASR tool supporting the language and timing needed. The original uses FunASR through `fap transcribe`; another installed transcriber is acceptable. Inspect its actual interface and model availability before running.
+2. Choose an available ASR tool supporting the language and timing needed. The original uses FunASR through `fap transcribe`; another installed transcriber is acceptable. Inspect its actual interface, and `get_capabilities` for model availability, before running.
 3. Transcribe the entire requested recording. For chunked input, keep chunk offsets and reconcile duplicate words in overlaps. Distinguish silence, music, and unintelligible speech from missing processing coverage.
 4. Inspect disputed names/numbers and sample the beginning, middle, and end against the audio. Correct recognition errors while preserving spoken meaning. Label a cleaned reading transcript separately from a verbatim transcript.
 5. For word-level replacement or subtitle sync, obtain actual word alignment. Sentence timestamps or estimated reading speed cannot establish word boundaries. When the tool lacks the necessary precision, report that limitation or use a supported aligner.

@@ -21,7 +21,7 @@ edittude-v3 media --help
 edittude-v3 media inventory FOLDER --out inventory.json
 ```
 
-Subcommands: inventory, thumbs, plan, assemble, mix, grade, titles, captions, reframe, finish, qc, frames, recut, proof.
+Subcommands: inventory, thumbs, plan, assemble, mix, grade, titles, captions, reframe, finish, qc, frames, recut, proof, models.
 
 Subagents via `task`: inventory, editor, mixer, qc.
 

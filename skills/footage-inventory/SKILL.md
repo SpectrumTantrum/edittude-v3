@@ -9,7 +9,7 @@ Know the bin before you cut.
 
 ## Steps
 
-1. `ls` the folder. Skip `artifacts/`, `dataset/`, `.edittude/`.
+1. `ls` the folder. Inventory skips `.edittude/`, `.edittude-v3/`, `.git/`, `.venv/`, `__pycache__/`, `artifacts/`, `cache/`, `dataset/`.
 2. Run:
 
 ```

@@ -53,6 +53,8 @@ edittude-v3 media qc final.mp4 --out qc.json
 edittude-v3 media proof FOLDER --out /path/to/artifacts
 ```
 
+None of these overwrite an existing output. Rerunning one onto the same file needs `--force`, before or after the subcommand: `edittude-v3 media --force assemble edl.json --out picture.mp4`.
+
 Write large renders next to the footage, not into this repo.
 
 ## Neural models (opt-in)

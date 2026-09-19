@@ -1,6 +1,6 @@
 # Portable video tools
 
-This folder contains executable Python tools. `get_tools(workspace)` in `__init__.py` returns ten ordinary callables; edittude-v3 loads and registers them with DeepAgents. The implementation imports no Edittude or HKU modules. Copy this folder and the sibling [skills folder](../skills/README.md) into another repository, then register the returned callables in that host.
+This folder contains executable Python tools. `get_tools(workspace)` in `__init__.py` returns eleven ordinary callables; edittude-v3 loads and registers them with DeepAgents. The implementation imports no Edittude or HKU modules. Copy this folder and the sibling [skills folder](../skills/README.md) into another repository, then register the returned callables in that host.
 
 ## Run without a harness
 
@@ -33,7 +33,7 @@ Pass `--workspace PATH` when the process is running elsewhere. Media-tool paths 
 
 Tool calls return `status: ok`, `error`, or `unavailable`. Missing models are explicit failures, never invented outputs. Backend discovery distinguishes configuration from successful inference. Generated audio/video is probed and decoded before publishing. Listening, factual relevance, and artistic quality still require agent/user review.
 
-Writing narration, adapting scripts, choosing shots, assigning voices, and grouping timed phrases remain the agent's work. Each [skill](../skills/README.md) names its registered tool calls. The [manifest](../skills/manifest.json) records the complete mapping.
+Writing narration, adapting scripts, choosing shots, assigning voices, and grouping timed phrases remain the agent's work. A [skill](../skills/README.md) names a registered tool call only where it needs a specific one. The [manifest](../skills/manifest.json) records the complete mapping.
 
 ## Render request fields
 
@@ -56,7 +56,7 @@ Timeline settings are `width`, `height`, `fps`, `fit` of `pad` or `crop`, and `a
 {"request":{"op":"timeline","output":"/artifacts/edit.mp4","width":1280,"height":720,"fps":30,"fit":"pad","audio_policy":"keep","shots":[{"id":"shot-01","path":"/clips/input.mp4","source_start":1,"source_end":3,"start":0,"end":2}]}}
 ```
 
-`audio_timing` accepts `request` with `path`, `method`, optional `start`, `end`, and JSON `output`. Silence options are `threshold_db=-35` and `minimum_silence=0.2`. RMS/onset options are `window_ms=50`, `threshold_ratio=0.35`, `minimum_interval=0.25`, and optional `include_envelope=true`. Times refer to the original input, including when only a range is analyzed.
+`audio_timing` accepts `request` with `path`, `method`, optional `start`, `end`, and JSON `output`. Silence options are `threshold_db=-35` and `minimum_silence=0.2`. RMS/onset options are `window_ms=50`, `threshold_ratio=0.35`, `minimum_interval=0.25`, and optional `include_envelope=true`. RMS/onset analysis always decodes a mono 16 kHz copy, and options belonging to the other method, or to a library this tool does not use, are ignored without an error; the returned `settings` report what was actually applied. Times refer to the original input, including when only a range is analyzed.
 
 `score_read` accepts `request` with MIDI `path`, optional numeric `track`, and optional JSON `output`. It returns notes, rests, and integrated tempo timing. Lyric alignment and melody selection remain the agent's decisions.
 
@@ -87,4 +87,4 @@ The first checks the 33 skills and provenance manifest. Optional `--source PATH`
 
 In edittude-v3, run the host integration checks with `python -m unittest discover -s tests -v`. To include cached ASR, set `EDITTUDE_TEST_ASR_PYTHON` to an interpreter with faster-whisper and a cached base model. The stock-speech test needs access to the operating system's speech service.
 
-The 19 checks passed locally, including actual rendering, source preservation, model failure paths, stock speech, cached speech recognition, and skill/tool use by the main agent and an inventory subagent. A live DeepSeek run also read a skill and called inspection/rendering tools successfully. Demucs, DiffSinger, and Seed-VC inference were not run; those adapters need the configured model assets above.
+Those checks passed locally, including actual rendering, source preservation, model failure paths, stock speech, cached speech recognition, and skill/tool use by the main agent and an inventory subagent. A live DeepSeek run also read a skill and called inspection/rendering tools successfully. Demucs, DiffSinger, and Seed-VC inference were not run; those adapters need the configured model assets above.
