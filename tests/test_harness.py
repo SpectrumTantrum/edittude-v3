@@ -27,6 +27,7 @@ from edittude_v3.cli import _parser, main
 from edittude_v3.skills import list_skill_names, list_skills
 from edittude_v3.tools import list_tool_names, load_workspace_tools
 from edittude_v3.tui import fmt_duration
+from tools import get_tools
 
 ROOT = Path(__file__).resolve().parents[1]
 MEDIA_TOOLS = {
@@ -233,17 +234,57 @@ class HarnessTest(unittest.TestCase):
         ):
             self.assertEqual(fmt_duration(seconds), expected)
 
+    def test_portable_tools_return_an_error_dict(self):
+        """tools/ stays harness-free: plain callables, plain dicts, no raising."""
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            registered = {item.__name__: item for item in get_tools(workspace)}
+            for arguments in ({}, {"op": "resample", "path": "../source.wav", "output": "/out.wav"}):
+                result = registered["media_render"](arguments)
+                self.assertEqual(result["status"], "error", result)
+                self.assertTrue(result["error"])
+            self.assertFalse((workspace / "out.wav").exists())
+
     def test_tool_errors_are_returned_to_the_agent(self):
+        """The adapter turns those dicts into ToolMessage(status="error") for the UI."""
         with tempfile.TemporaryDirectory() as temporary:
             workspace = Path(temporary)
             shutil.copytree(ROOT / "tools", workspace / "tools",
                             ignore=shutil.ignore_patterns("__pycache__"))
             registered = {item.name: item for item in load_workspace_tools(workspace)}
-            for arguments in ({}, {"op": "resample", "path": "../source.wav", "output": "/out.wav"}):
-                result = registered["media_render"].invoke({"request": arguments})
-                self.assertEqual(result["status"], "error", result)
-                self.assertTrue(result["error"])
+            message = registered["media_render"].invoke(
+                {"name": "media_render", "args": {"request": {}},
+                 "id": "call_1", "type": "tool_call"}
+            )
+            self.assertIsInstance(message, ToolMessage)
+            self.assertEqual(message.status, "error")
+            self.assertEqual(message.tool_call_id, "call_1")
+            self.assertEqual(json.loads(message.content)["status"], "error")
             self.assertFalse((workspace / "out.wav").exists())
+
+    def test_adapter_flags_unavailable_and_leaves_success_alone(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            (workspace / "tools").mkdir()
+            (workspace / "tools" / "__init__.py").write_text(
+                "def missing() -> dict:\n"
+                "    '''Report a missing runtime.'''\n"
+                "    return {'status': 'unavailable', 'error': 'no demucs'}\n"
+                "def fine() -> dict:\n"
+                "    '''Succeed.'''\n"
+                "    return {'status': 'ok', 'path': '/out.wav'}\n"
+                "def get_tools(workspace):\n"
+                "    return [missing, fine]\n", encoding="utf-8",
+            )
+            registered = {item.name: item for item in load_workspace_tools(workspace)}
+            call = {"args": {}, "id": "call_1", "type": "tool_call"}
+            unavailable = registered["missing"].invoke({**call, "name": "missing"})
+            self.assertEqual(unavailable.status, "error")
+            self.assertEqual(json.loads(unavailable.content),
+                             {"status": "unavailable", "error": "no demucs"})
+            ok = registered["fine"].invoke({**call, "name": "fine"})
+            self.assertEqual(ok.status, "success")
+            self.assertEqual(json.loads(ok.content), {"status": "ok", "path": "/out.wav"})
 
     def test_skill_manifest_maps_to_model_compatible_tools(self):
         registered = load_workspace_tools(ROOT)

@@ -1,17 +1,40 @@
 from __future__ import annotations
 
+import functools
 import importlib.util
+import json
 import sys
 import uuid
 from pathlib import Path
 from types import ModuleType
 
-from langchain_core.tools import BaseTool, tool
+from langchain_core.tools import BaseTool, ToolException, tool
 
 from edittude_v3.paths import install_root
 
 # One loaded package per tools/__init__.py; the TUI loads tools twice at startup.
 _PACKAGES: dict[Path, ModuleType] = {}
+
+
+def _as_tool(item):
+    """Turn a portable tool's {"status": "error"} dict into ToolMessage(status="error").
+
+    tools/ stays harness-free and keeps returning dicts. The ToolException carries the
+    exact JSON langchain would have stringified anyway, so the model reads the same text.
+    """
+    if isinstance(item, BaseTool):
+        return item
+
+    @functools.wraps(item)
+    def wrapper(*args, **kwargs):
+        result = item(*args, **kwargs)
+        if isinstance(result, dict) and result.get("status") in {"error", "unavailable"}:
+            raise ToolException(json.dumps(result, ensure_ascii=False))
+        return result
+
+    built = tool(wrapper)
+    built.handle_tool_error = True
+    return built
 
 
 def load_workspace_tools(workspace: Path) -> list[BaseTool]:
@@ -42,7 +65,7 @@ def load_workspace_tools(workspace: Path) -> list[BaseTool]:
         registered = package.get_tools(workspace)
         if not isinstance(registered, list):
             raise TypeError("get_tools(workspace) must return a list of callables or tools")
-        result = [item if isinstance(item, BaseTool) else tool(item) for item in registered]
+        result = [_as_tool(item) for item in registered]
         names = [item.name for item in result]
         if len(names) != len(set(names)):
             raise ValueError("get_tools(workspace) returned duplicate tool names")

@@ -1,6 +1,7 @@
 """Regression checks for the five harness and portable-tool fixes."""
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import shutil
@@ -14,7 +15,7 @@ from unittest.mock import patch
 from langchain_core.messages import ToolMessage
 from langgraph.types import Command
 
-from edittude_v3.events import preview
+from edittude_v3.events import iter_turn, preview
 from edittude_v3.tools import load_workspace_tools
 from tools import install_models
 from tools.common import model_python
@@ -51,6 +52,23 @@ class HarnessFixesTest(unittest.TestCase):
                               tool_call_id="call")
         self.assertEqual(preview(message), "actual result")
         self.assertEqual(preview(Command(update={"messages": [message]})), "actual result")
+
+    def test_iter_turn_flags_failed_tool_calls(self):
+        """Failures used to render as done: no status, and nothing at all on a raise."""
+        class FakeAgent:
+            async def astream_events(self, _payload, config=None, version=None):
+                for status in ("success", "error"):
+                    message = ToolMessage(content=status, tool_call_id="call", status=status)
+                    yield {"event": "on_tool_end", "run_id": "run", "data": {"output": message}}
+                yield {"event": "on_tool_error", "run_id": "run",
+                       "data": {"error": ValueError("boom"), "input": {}}}
+
+        async def collect():
+            return [payload async for _, payload in iter_turn(FakeAgent(), "prompt", "thread")]
+
+        events = asyncio.run(collect())
+        self.assertEqual([event["status"] for event in events], ["done", "error", "error"])
+        self.assertEqual(preview(events[-1]["output"]), "boom")
 
     def test_installed_v2_skips_a_malformed_manifest(self):
         entry = {"rev": "revision", "files": ["model.bin"]}

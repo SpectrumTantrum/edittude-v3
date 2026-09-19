@@ -113,10 +113,24 @@ async def iter_turn(
             continue
 
         if kind == "on_tool_end":
+            output = data.get("output")
             yield (
                 "tool_end",
                 {
                     "id": run_id,
-                    "output": data.get("output"),
+                    "output": output,
+                    "status": "error" if getattr(output, "status", None) == "error" else "done",
+                },
+            )
+            continue
+
+        # A tool that raises never reaches on_tool_end, so close the card here.
+        if kind == "on_tool_error":
+            yield (
+                "tool_end",
+                {
+                    "id": run_id,
+                    "output": data.get("error"),
+                    "status": "error",
                 },
             )

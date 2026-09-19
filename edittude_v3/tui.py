@@ -223,7 +223,10 @@ def run_tui(*, workspace: Path, thread: str | None = None) -> None:
                     card = cards.get(payload["id"])
                     if card is None:
                         continue
-                    card.update(status="done", output=preview(payload.get("output")))
+                    card.update(
+                        status=payload.get("status", "done"),
+                        output=preview(payload.get("output")),
+                    )
         finally:
             stop_spinner()
             close_stream()

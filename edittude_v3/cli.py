@@ -156,7 +156,10 @@ async def _ask_async(prompt: str, workspace: Path, thread: str) -> None:
                 )
             elif kind == "tool_end":
                 out = escape(preview(payload.get("output"), limit=80))
-                console.print(f"  [{GREY}]┃[/] [dim]{out}[/]", highlight=False)
+                if payload.get("status") == "error":
+                    console.print(f"  [{RED}]✗ {out}[/]", highlight=False)
+                else:
+                    console.print(f"  [{GREY}]┃[/] [dim]{out}[/]", highlight=False)
 
     text = "".join(parts).strip()
     if text:
